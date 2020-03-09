@@ -1,0 +1,18 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+jupyter = "*"
+pandas = "*"
+matplotlib = "*"
+seaborn = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.7"
+
+[packages.bffdd03]
+path = "/home/bnikolic/oss/hera_cal"
