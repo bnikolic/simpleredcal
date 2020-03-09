@@ -19,7 +19,7 @@ def fltBad(bls, badl,
     """Filter bad baselines
 
     :param badl: List of bad antennas
-    :param minbl: Minimum number of observed baselines in a group 
+    :param minbl: Minimum number of observed baselines in a group
     """
     r1=map(functools.partial(filter, lambda x: not (x[0] in badl or x[1] in badl)), bls)
     r2=list(map(list, r1))
@@ -58,11 +58,11 @@ def vgLkl(p, redg, obsvis):
 
     """
     NVis=redg[:,0].max()+1
-    vis, gains=numpy.split(p, [NVis,])
-    gains=gains.reshape((-1,2))
-    delta=obsvis-gVis(vis, redg, gains[:,0]+1j*gains[:,1])
+    vis, gains=numpy.split(p, [NVis*2,])
+    vis=vis.reshape((-1, 2))
+    gains=gains.reshape((-1, 2))
+    delta=obsvis-gVis(vis[:,0]+1j*vis[:,1], redg, gains[:,0]+1j*gains[:,1])
     return (numpy.abs(delta)**2).sum()
-
 
 def pvis(v):
     pyplot.plot(v.real, label="real")
@@ -70,4 +70,3 @@ def pvis(v):
     pyplot.legend()
     pyplot.savefig("plots/vis.png")
     pyplot.clf()
-
