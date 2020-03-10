@@ -8,6 +8,8 @@ jupyter = "*"
 pandas = "*"
 matplotlib = "*"
 seaborn = "*"
+jax = "*"
+jaxlib = "*"
 
 [dev-packages]
 
