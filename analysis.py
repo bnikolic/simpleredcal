@@ -1,18 +1,19 @@
-from hera_cal.io import HERAData, HERACal
-from hera_cal.redcal import get_reds
 import functools
 import itertools
 
 import numpy as np
 import scipy
-
-import pandas as pd
 from scipy.optimize import minimize
 import scipy.stats as stats
+import pandas as pd
+
 import seaborn as sns
 
 sns.set()
 sns.set_style("whitegrid")
+
+from hera_cal.io import HERAData, HERACal
+from hera_cal.redcal import get_reds
 
 
 def fltBad(bls, badl,
