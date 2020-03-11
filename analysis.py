@@ -1,18 +1,28 @@
-from hera_cal.io import HERAData, HERACal
-from hera_cal.redcal import get_reds
 import functools
 import itertools
 
-import numpy as np
+import numpy
 import scipy
-
-import pandas as pd
 from scipy.optimize import minimize
 import scipy.stats as stats
+import pandas as pd
+
+from jax.config import config
+config.update("jax_enable_x64", True)
+import jax
+from jax import jit, jacrev
+
+# NB. Where "numpy" is used below it has to be real numpy. "np" can be
+# either jax or real numpy
+np=jax.np
+
 import seaborn as sns
 
 sns.set()
 sns.set_style("whitegrid")
+
+from hera_cal.io import HERAData, HERACal
+from hera_cal.redcal import get_reds
 
 
 def fltBad(bls, badl,
@@ -34,36 +44,35 @@ def groupBls(bll):
 
 def condenseMap(a):
     """Return a mapping of indicies to a dense index set"""
-    return dict(map(reversed, enumerate(np.unique(a))))
+    return dict(map(reversed, enumerate(numpy.unique(a))))
 
 
 def relabelAnts(a):
     """Relabel antennas with consecutive numbering"""
     ci = condenseMap(a[:, 1:3])
-    a = a.copy()
+    a = numpy.copy(a)
     for i in range(len(a)):
         a[i, 1] = ci[a[i, 1]]
         a[i, 2] = ci[a[i, 2]]
     return a
 
-
+@jit
 def gVis(vis, redg, gains):
     """Apply gains to visibilities
 
     :param vis: true sky visibilities
     """
-    redg = relabelAnts(redg)
     return vis[redg[:, 0]]*gains[redg[:, 1]]*np.conj(gains[redg[:, 2]])
 
-
-def vgLkl(p, redg, obsvis, dist='gaussian'):
+def vgLkl(redg, dist, p, obsvis):
     """Simple likelihood calculator
 
-    We set the noise for each visibility to be 1.
+    We set the noise for each visibility to be 1. Note parameter order
+    is such that function can be usefully partially applied
 
     :param redg: Reundant groups
     """
-    NVis = redg[:, 0].max()+1
+    NVis = redg[:, 0].max().item()+1
     vis, gains = np.split(p, [NVis*2, ])
     vis = vis.reshape((-1, 2))
     gains = gains.reshape((-1, 2))
@@ -83,3 +92,4 @@ def pvis(v):
     pyplot.legend()
     pyplot.savefig("plots/vis.png")
     pyplot.clf()
+
