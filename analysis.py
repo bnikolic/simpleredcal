@@ -38,7 +38,7 @@ def condenseMap(a):
 
 
 def relabelAnts(a):
-    """Relabel antennas with consequitive numbering"""
+    """Relabel antennas with consecutive numbering"""
     ci = condenseMap(a[:, 1:3])
     a = a.copy()
     for i in range(len(a)):
