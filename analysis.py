@@ -92,4 +92,3 @@ def pvis(v):
     pyplot.legend()
     pyplot.savefig("plots/vis.png")
     pyplot.clf()
-
