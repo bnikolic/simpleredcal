@@ -2,9 +2,13 @@ import functools
 import itertools
 
 import numpy
+
+from matplotlib import pyplot as plt
+from scipy import stats as stats
 from scipy.optimize import minimize
-import scipy.stats as stats
-import pandas as pd
+
+from hera_cal.io import HERAData
+from hera_cal.redcal import get_reds
 
 from jax.config import config
 config.update("jax_enable_x64", True)
@@ -14,15 +18,6 @@ from jax import jit, jacrev
 # NB. Where "numpy" is used below it has to be real numpy. "np" can be
 # either jax or real numpy
 np=jax.np
-
-from matplotlib import pyplot as plt
-import seaborn as sns
-
-sns.set()
-sns.set_style("whitegrid")
-
-from hera_cal.io import HERAData, HERACal
-from hera_cal.redcal import get_reds
 
 
 def fltBad(bls, badl,
@@ -39,7 +34,10 @@ def fltBad(bls, badl,
 
 
 def groupBls(bll):
-    """Group redundant baselines to indices of unique baselines"""
+    """Group redundant baselines to indices of unique baselines
+
+    Format is [[groupid, i, j]]
+    """
     return np.array([(g, i, j) for (g, bl) in enumerate(bll) for (i, j, p) in bl])
 
 
@@ -60,6 +58,37 @@ def relabelAnts(bl_groups):
         bl_groups[i, 1] = ci[bl_groups[i, 1]]
         bl_groups[i, 2] = ci[bl_groups[i, 2]]
     return bl_groups
+
+
+def group_data(fn, pol, freq_chan, bad_ants):
+    """Returns redundant baseline grouping and reformatted dataset
+
+    :param fn: Filename of uvh5 dataset
+    :type fn: str
+    :param pol: Polarization of data
+    :type pol: str
+    :param freq_chan: Frequency channel(s) {0, 1023}
+    :type freq_chan: int, list
+    :param bad_ants: Known bad antennas to flag
+    :type bad_ants: list
+
+    :return hd: HERAData class
+    :rtype hd: HERAData class
+    :return redg: Redundant grouping with format from groupBls function
+    :rtype redg: array
+    :return cdata: Visibility data grouping with consistent format to redg
+    :rtype cdata:
+    """
+    hd = HERAData(fn)
+    reds = get_reds(hd.antpos, pols=[pol])
+    if isinstance(freq_chan, int):
+        freq_chan = [freq_chan]
+    data, flags, nsamples = hd.read(freq_chans=freq_chan)
+    flt_bls = fltBad(reds, bad_ants)
+    redg = groupBls(flt_bls) # Baseline grouping
+    cdata = numpy.hstack([data[(bl_row[1], bl_row[2], 'ee')] for bl_row in
+            redg]) # Collect data together
+    return hd, redg, cdata
 
 
 def redblMap(bl_grouping):
@@ -194,9 +223,65 @@ def optimal_logLkl(redg, distribution, obsvis, ant_sep, red_vis_comps, params):
     return log_likelihood
 
 
+class Deg_constraints:
+    """Gain, phase and phase gradient constraints for optimal redundant
+       calibration
+    :param ants: Antenna numbers dealt with in visibility dataset
+    :type ants: array
+    :param ref_ant: Antenna number of reference antenna to constraint overall phase
+    :type ref_ant: int
+    :param ant_pos: Dictionary of antenna position coordinates for the antennas
+                    in ants
+    :type ant_pos: dict
+    """
+
+    def __init__(self, ants, ref_ant, ant_pos):
+        self.ants = ants
+        self.ref_ant = ref_ant
+        self.ant_pos = ant_pos
+
+    def get_ant_idx(self, ant_no):
+        """Returns the array index of the antenna"""
+        return condenseMap(self.ants)[ant_no]
+
+    def get_rel_gains(self, params):
+        """Returns the complex relative gain parameters from the flattened array
+           of parameters"""
+        rel_gains_comps = params[:self.ants.size*2].reshape((-1, 2))
+        rel_gains = rel_gains_comps[:, 0] + 1j*rel_gains_comps[:, 1]
+        return rel_gains
+
+    def avg_amp(self, params):
+        """Constraint that average of gain amplitudes must be equal to 1"""
+        rel_gains = self.get_rel_gains(params)
+        return np.average(np.abs(rel_gains)) - 1
+
+    def avg_phase(self, params):
+        """Constraint that average of gain phases must be equal to 0"""
+        rel_gains = self.get_rel_gains(params)
+        return stats.circmean(np.angle(rel_gains))
+
+    def ref_phase(self, params):
+        """Set argument of reference antenna to zero to set overall phase"""
+        rel_gains = self.get_rel_gains(params)
+        return np.angle(rel_gains[self.get_ant_idx(self.ref_ant)])
+
+    def phase_grad(self, params):
+        """Constraint that phase gradient is zero"""
+        rel_gains_comps, deg_params = np.split(params, [2*self.ants.size,])
+        _, overall_phase, phase_grad_x, phase_grad_y = deg_params
+        rel_gains_comps = rel_gains_comps.reshape((-1, 2))
+        rel_gains = rel_gains_comps[:, 0] + 1j*rel_gains_comps[:, 1]
+        x_ant_ref_pos, y_ant_ref_pos = self.ant_pos[self.ref_ant][:2]
+        phase_gradient = np.angle(rel_gains[self.get_ant_idx(self.ref_ant)]) - \
+                         overall_phase - x_ant_ref_pos * phase_grad_x - \
+                         y_ant_ref_pos * phase_grad_y
+        return phase_gradient
+
+
 def pvis(v):
-    plt.plot(v.real, label="real")
-    plt.plot(v.imag, label="imag")
+    plt.plot(v.real, label='real')
+    plt.plot(v.imag, label='imag')
     plt.legend()
-    plt.savefig("plots/vis.png")
+    plt.savefig('plots/vis.png')
     plt.clf()
