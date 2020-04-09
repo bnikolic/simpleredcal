@@ -166,12 +166,11 @@ def red_ant_sep(redg, ant_pos):
     return redant_seperation
 
 
-def reformatCArray(arr):
+def decomposeCArray(arr):
     """Reformat 1D complex array into 1D real array
 
     The 1D complex array with elements [z_1, ..., z_i] is reformatted such
-    that the new array has elements [Re(z_1), Im(z_1), ..., Re(z_i), Im(z_i)],
-    which can be easily passed into the likelihood calculators.
+    that the new array has elements [Re(z_1), Im(z_1), ..., Re(z_i), Im(z_i)].
 
     :param arr: Complex array
     :type arr: ndarray
@@ -184,6 +183,25 @@ def reformatCArray(arr):
     assert arr.dtype  == numpy.complex
     new_arr = np.vstack((arr.real, arr.imag))
     return new_arr.transpose().flatten()
+
+
+def makeCArray(arr):
+    """Reformat 1D real array into 1D complex array
+
+    The 1D real array with elements [Re(z_1), Im(z_1), ..., Re(z_i), Im(z_i)]
+    is reformatted such that the new array has elements [z_1, ..., z_i].
+
+    :param arr: Real array where the complex elements of arr have been decomposed
+    into adjacent real elements
+    :type arr: ndarray
+
+    :return: Complex array
+    :rtype: ndarray
+    """
+    assert arr.ndim == 1
+    assert arr.dtype  == numpy.float
+    arr = arr.reshape((-1, 2))
+    return arr[:, 0] + 1j*arr[:, 1]
 
 
 @jit
@@ -227,11 +245,8 @@ def relative_logLkl(redg, distribution, obsvis, params):
     """
     NRedVis = redg[:, 0].max().item() + 1
     vis_comps, gains_comps = np.split(params, [NRedVis*2, ])
-    vis_comps = vis_comps.reshape((-1, 2))
-    gains_comps = gains_comps.reshape((-1, 2))
-
-    vis = vis_comps[:, 0] + 1j*vis_comps[:, 1]
-    gains = gains_comps[:, 0] + 1j*gains_comps[:, 1]
+    vis = makeCArray(vis_comps)
+    gains = makeCArray(gains_comps)
 
     delta = obsvis - gVis(vis, redg, gains)
 
@@ -274,9 +289,7 @@ def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
     NAnts = redg[:, 1:].max().item() + 1
     rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
     amp, overall_phase, phase_grad_x, phase_grad_y = deg_params
-    rel_gains_comps = rel_gains_comps.reshape((-1, 2))
-
-    rel_gains = rel_gains_comps[:, 0] + 1j*rel_gains_comps[:, 1]
+    rel_gains = makeCArray(rel_gains_comps)
     x_sep = ant_sep[:, 0]
     y_sep = ant_sep[:, 1]
 
@@ -295,7 +308,7 @@ def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
     return log_likelihood
 
 
-class Deg_Constraints:
+class Opt_Constraints:
     """Gain, phase and phase gradient constraints for optimal redundant
        calibration
 
@@ -317,20 +330,11 @@ class Deg_Constraints:
         self.ref_ant = ref_ant
         self.ant_pos = ant_pos
 
-    def get_ant_idx(self, ant_no):
-        """Returns the array index of the antenna
-
-        :param ant_no: Antenna number
-        :type ant_no: int
-        """
-        return condenseMap(self.ants)[ant_no]
-
     def get_rel_gains(self, params):
         """Returns the complex relative gain parameters from the flattened array
         of parameters"""
-        rel_gains_comps = params[:self.ants.size*2].reshape((-1, 2))
-        rel_gains = rel_gains_comps[:, 0] + 1j*rel_gains_comps[:, 1]
-        return rel_gains
+        rel_gains_comps = params[:self.ants.size*2]
+        return makeCArray(rel_gains_comps)
 
     def avg_amp(self, params):
         """Constraint that average of gain amplitudes must be equal to 1"""
@@ -345,18 +349,20 @@ class Deg_Constraints:
     def ref_phase(self, params):
         """Set argument of reference antenna to zero to set overall phase"""
         rel_gains = self.get_rel_gains(params)
-        return np.angle(rel_gains[self.get_ant_idx(self.ref_ant)])
+        ref_ant_idx = condenseMap(self.ants)[self.ref_ant]
+        return np.angle(rel_gains[ref_ant_idx])
 
     def phase_grad(self, params):
-        """Constraint that phase gradient is zero"""
-        rel_gains_comps, deg_params = np.split(params, [2*self.ants.size,])
+        """Constraint that phase gradient is zero
+
+        TODO:
+        2) does the phase gradient need to be made zero across all gains?
+        """
+        deg_params = params[-4:] # set degenerate parameters at the end
         _, overall_phase, phase_grad_x, phase_grad_y = deg_params
-        rel_gains_comps = rel_gains_comps.reshape((-1, 2))
-        rel_gains = rel_gains_comps[:, 0] + 1j*rel_gains_comps[:, 1]
         x_ant_ref_pos, y_ant_ref_pos = self.ant_pos[self.ref_ant][:2]
-        phase_gradient = np.angle(rel_gains[self.get_ant_idx(self.ref_ant)]) - \
-                         overall_phase - x_ant_ref_pos * phase_grad_x - \
-                         y_ant_ref_pos * phase_grad_y
+        phase_gradient = overall_phase + (x_ant_ref_pos * phase_grad_x) + \
+                         (y_ant_ref_pos * phase_grad_y)
         return phase_gradient
 
 
