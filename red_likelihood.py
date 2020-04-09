@@ -2,7 +2,6 @@ import functools
 import itertools
 
 import numpy
-
 from matplotlib import pyplot as plt
 from scipy import stats as stats
 from scipy.optimize import minimize
@@ -246,7 +245,7 @@ def relative_logLkl(redg, distribution, obsvis, params):
     return log_likelihood
 
 
-def optimal_logLkl(redg, distribution, obsvis, ant_sep, rel_vis_comps, params):
+def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
     """Optimal likelihood calculator
 
     We solve for the degeneracies in redundant calibration. This must be done
@@ -262,11 +261,11 @@ def optimal_logLkl(redg, distribution, obsvis, ant_sep, rel_vis_comps, params):
     :type obsvis: ndarray
     :param ant_sep: Antenna seperation for baseline types
     :type ant_sep: ndarray
-    :param rel_vis_comps: Visibility solutions for redundant baseline groups after
+    :param rel_vis: Visibility solutions for redundant baseline groups after
     relative calibration
-    :param rel_vis_comps: ndarray
+    :param rel_vis: ndarray
     :param params: Parameters to constrain: normalized gains, overall amplitude,
-    phase gradients in x and y
+    overall phase and phase gradients in x and y
     :type params: ndarray
 
     :return: Negative log-likelihood of MLE computation
@@ -275,16 +274,14 @@ def optimal_logLkl(redg, distribution, obsvis, ant_sep, rel_vis_comps, params):
     NAnts = redg[:, 1:].max().item() + 1
     rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
     amp, overall_phase, phase_grad_x, phase_grad_y = deg_params
-    rel_vis_comps = rel_vis_comps.reshape((-1, 2))
     rel_gains_comps = rel_gains_comps.reshape((-1, 2))
 
-    rel_vis = rel_vis_comps[:, 0] + 1j*rel_vis_comps[:, 1]
     rel_gains = rel_gains_comps[:, 0] + 1j*rel_gains_comps[:, 1]
     x_sep = ant_sep[:, 0]
     y_sep = ant_sep[:, 1]
 
     w_alpha  = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
-               * y_sep)) * (rel_vis)
+               * y_sep)) * rel_vis
 
     delta = obsvis - gVis(w_alpha, redg, rel_gains)
 
@@ -298,7 +295,7 @@ def optimal_logLkl(redg, distribution, obsvis, ant_sep, rel_vis_comps, params):
     return log_likelihood
 
 
-class Deg_constraints:
+class Deg_Constraints:
     """Gain, phase and phase gradient constraints for optimal redundant
        calibration
 
@@ -363,14 +360,46 @@ class Deg_constraints:
         return phase_gradient
 
 
-def deg_logLkl():
+def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     """Degenerate likelihood calculator
 
     Max-likelihood estimate to solve for the degenerate parameters that transform
     between the visibility solutions of two different datasets after relative
     calibration
+
+    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :type distribution: str
+    :param ant_sep: Antenna seperation for baseline types
+    :type ant_sep: ndarray
+    :param rel_vis1: Visibility solutions for redundant baseline groups after
+    relative calibration for dataset 1
+    :type rel_vis1: ndarray
+    :param rel_vis2: Visibility solutions for redundant baseline groups after
+    relative calibration for dataset 2
+    :type rel_vis2: ndarray
+    :param params: Parameters to constrain: overall amplitude, overall phase and
+    phase gradients in x and y
+    :type params: ndarray
+
+    :return: Negative log-likelihood of MLE computation
+    :rtype: ndarray (1 element)
     """
-    return
+
+    amp, overall_phase, phase_grad_x, phase_grad_y = params
+    x_sep = ant_sep[:, 0]
+    y_sep = ant_sep[:, 1]
+    w_alpha = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
+               * y_sep)) * rel_vis1
+    delta = rel_vis2 - w_alpha
+
+    if distribution == 'gaussian':
+         log_likelihood = np.square(np.abs(delta)).sum()
+    elif distribution == 'cauchy':
+        log_likelihood = np.log(1 + np.square(np.abs(delta))).sum()
+    else:
+        raise ValueError('Specify correct type of distribution for MLE estimation')
+
+    return log_likelihood
 
 
 def pvis(vis):
