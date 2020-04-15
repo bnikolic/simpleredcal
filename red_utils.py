@@ -98,4 +98,3 @@ def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots
             os.mkdir(save_dir)
         plt.savefig('{}/vis.png'.format(save_dir))
     plt.show()
-    plt.clf()
