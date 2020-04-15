@@ -1,3 +1,6 @@
+"""Robust redundant calibration"""
+
+
 import functools
 import itertools
 
@@ -406,11 +409,3 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
         raise ValueError('Specify correct type of distribution for MLE estimation')
 
     return log_likelihood
-
-
-def pvis(vis):
-    plt.plot(vis.real, label='real')
-    plt.plot(vis.imag, label='imag')
-    plt.legend()
-    plt.savefig('plots/vis.png')
-    plt.clf()
