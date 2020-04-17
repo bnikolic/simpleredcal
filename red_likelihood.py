@@ -223,6 +223,9 @@ def gVis(vis, redg, gains):
     """
     return vis[redg[:, 0]]*gains[redg[:, 1]]*np.conj(gains[redg[:, 2]])
 
+# Could also put these in a module and then use getattr
+LLFN = { "cauchy" : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
+         "gaussian" : lambda delta: np.square(np.abs(delta)).sum() }
 
 def relative_logLkl(redg, distribution, obsvis, params):
     """Redundant relative likelihood calculator
@@ -253,12 +256,7 @@ def relative_logLkl(redg, distribution, obsvis, params):
 
     delta = obsvis - gVis(vis, redg, gains)
 
-    if distribution == 'gaussian':
-        log_likelihood = np.square(np.abs(delta)).sum() # omit factor of 0.5
-    elif distribution == 'cauchy':
-        log_likelihood = np.log(1 + np.square(np.abs(delta))).sum()
-    else:
-        raise ValueError('Specify correct type of distribution for MLE estimation')
+    log_likelihood = LLFN[distribution](delta)
 
     return log_likelihood
 
@@ -301,12 +299,7 @@ def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
 
     delta = obsvis - gVis(w_alpha, redg, rel_gains)
 
-    if distribution == 'gaussian':
-         log_likelihood = np.square(np.abs(delta)).sum()
-    elif distribution == 'cauchy':
-        log_likelihood = np.log(1 + np.square(np.abs(delta))).sum()
-    else:
-        raise ValueError('Specify correct type of distribution for MLE estimation')
+    log_likelihood = LLFN[distribution](delta)
 
     return log_likelihood
 
@@ -401,12 +394,7 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
                * y_sep)) * rel_vis1
     delta = rel_vis2 - w_alpha
 
-    if distribution == 'gaussian':
-         log_likelihood = np.square(np.abs(delta)).sum()
-    elif distribution == 'cauchy':
-        log_likelihood = np.log(1 + np.square(np.abs(delta))).sum()
-    else:
-        raise ValueError('Specify correct type of distribution for MLE estimation')
+    log_likelihood = LLFN[distribution](delta)
 
     return log_likelihood
 
