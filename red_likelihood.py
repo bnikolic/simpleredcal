@@ -409,3 +409,41 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
         raise ValueError('Specify correct type of distribution for MLE estimation')
 
     return log_likelihood
+
+def doRedCal(redG, vis, m="cauchy"):
+    """
+    Do Redundant Calibration
+    """
+    # Finding all the antennas used in our flagged data
+    ants = numpy.unique(redG[:,1:])
+    no_unq_bls = numpy.unique(redG[:, 0]).size
+    #Setup initial parameters
+    xvis = numpy.ones(no_unq_bls*2) # Number of unique baselines; complex vis
+    xgains = numpy.ones(ants.size*2) # Complex gain
+    initp= numpy.hstack([xvis, xgains])    
+    ff = jit(functools.partial(relative_logLkl,
+                               relabelAnts(redG),
+                               m, 
+                               vis))
+    res = scipy.optimize.minimize(ff,
+                                  initp,
+                                  jac=jacrev(ff))
+    print(res["message"])
+    return res
+
+def doDegVisVis(antSep, vis1, vis2):
+    """
+    Fit degenerate reundant calibration parameters so that vis1 is as
+    close to as possible to vis2
+
+    :return: Scipy optimisation result object
+    """
+    initp = numpy.hstack([1, 0, 0, 0])
+    ff = jit(functools.partial(deg_logLkl, 'cauchy',
+                               antSep, 
+                               vis1, vis2))
+    res = scipy.optimize.minimize(ff,
+                                  initp,
+                                  jac=jacrev(ff))
+    print(res["message"])
+    return res
