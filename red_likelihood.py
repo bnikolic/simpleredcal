@@ -227,6 +227,16 @@ def gVis(vis, redg, gains):
 LLFN = { "cauchy" : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
          "gaussian" : lambda delta: np.square(np.abs(delta)).sum() }
 
+def degVis(ant_sep, vis, amp, overall_phase, phase_grad_x, phase_grad_y):
+    """
+    Transform visibilities in the dimensions degenerate to self/red-cal
+    """
+    x_sep = ant_sep[:, 0]
+    y_sep = ant_sep[:, 1]
+    w_alpha = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
+               * y_sep)) * vis
+    return w_alpha
+
 def relative_logLkl(redg, distribution, obsvis, params):
     """Redundant relative likelihood calculator
 
@@ -291,11 +301,9 @@ def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
     rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
     amp, overall_phase, phase_grad_x, phase_grad_y = deg_params
     rel_gains = makeCArray(rel_gains_comps)
-    x_sep = ant_sep[:, 0]
-    y_sep = ant_sep[:, 1]
 
-    w_alpha  = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
-               * y_sep)) * rel_vis
+    w_alpha = degVis(ant_sep, rel_vis, *deg_params)    
+
 
     delta = obsvis - gVis(w_alpha, redg, rel_gains)
 
@@ -386,12 +394,8 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: ndarray (1 element)
     """
+    w_alpha = degVis(ant_sep, rel_vis1, *params)
 
-    amp, overall_phase, phase_grad_x, phase_grad_y = params
-    x_sep = ant_sep[:, 0]
-    y_sep = ant_sep[:, 1]
-    w_alpha = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
-               * y_sep)) * rel_vis1
     delta = rel_vis2 - w_alpha
 
     log_likelihood = LLFN[distribution](delta)
