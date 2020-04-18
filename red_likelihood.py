@@ -125,7 +125,7 @@ def redblMap(redg):
     :rype: ndarray
     """
     bl_ids = numpy.unique(redg[:, 0], return_index=True)
-    return numpy.array(redg[bl_ids[1], :])
+    return np.array(redg[bl_ids[1], :])
 
 
 def red_ant_pos(redg, ant_pos):
@@ -223,19 +223,37 @@ def gVis(vis, redg, gains):
     """
     return vis[redg[:, 0]]*gains[redg[:, 1]]*np.conj(gains[redg[:, 2]])
 
-# Could also put these in a module and then use getattr
-LLFN = { "cauchy" : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
-         "gaussian" : lambda delta: np.square(np.abs(delta)).sum() }
 
-def degVis(ant_sep, vis, amp, overall_phase, phase_grad_x, phase_grad_y):
-    """
-    Transform visibilities in the dimensions degenerate to self/red-cal
+# Could also put these in a module and then use getattr
+LLFN = { 'cauchy' : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
+         'gaussian' : lambda delta: np.square(np.abs(delta)).sum() }
+
+
+def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
+    """Transform redundant visibilities according to the degenerate redundant
+    parameters
+
+    :param ant_sep: Antenna seperation for baseline types
+    :type ant_sep: ndarray
+    :param rel_vis: Visibility solutions for redundant baseline groups after
+    relative calibration
+    :param rel_vis: ndarray
+    :param amp: Overall amplitude
+    :type amp: float
+    :param phase_grad_x: Phase gradient component in x-direction
+    :type phase_grad_x: float
+    :param phase_grad_y: Phase gradient component in y-direction
+    :type phase_grad_y: float
+
+    :return: Transformed relatively calibrated true visibilities
+    :rtype: ndarray
     """
     x_sep = ant_sep[:, 0]
     y_sep = ant_sep[:, 1]
     w_alpha = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
-               * y_sep)) * vis
+               * y_sep)) * rel_vis
     return w_alpha
+
 
 def relative_logLkl(redg, distribution, obsvis, params):
     """Redundant relative likelihood calculator
@@ -265,9 +283,7 @@ def relative_logLkl(redg, distribution, obsvis, params):
     gains = makeCArray(gains_comps)
 
     delta = obsvis - gVis(vis, redg, gains)
-
     log_likelihood = LLFN[distribution](delta)
-
     return log_likelihood
 
 
@@ -299,22 +315,17 @@ def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
      """
     NAnts = redg[:, 1:].max().item() + 1
     rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
-    amp, overall_phase, phase_grad_x, phase_grad_y = deg_params
     rel_gains = makeCArray(rel_gains_comps)
 
-    w_alpha = degVis(ant_sep, rel_vis, *deg_params)    
-
-
+    w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
     delta = obsvis - gVis(w_alpha, redg, rel_gains)
-
     log_likelihood = LLFN[distribution](delta)
-
     return log_likelihood
 
 
 class Opt_Constraints:
     """Gain, phase and phase gradient constraints for optimal redundant
-       calibration
+    calibration
 
     Parameters to feed into constraint functions must be a flattened real array
     of normalized gains, overall_amplitude, overall phase, phase gradient x and
@@ -322,7 +333,7 @@ class Opt_Constraints:
 
     :param ants: Antenna numbers dealt with in visibility dataset
     :type ants: ndarray
-    :param ref_ant: Antenna number of reference antenna to constraint overall phase
+    :param ref_ant: Antenna number of reference antenna to constrain overall phase
     :type ref_ant: int
     :param ant_pos: Dictionary of antenna position coordinates for the antennas
     in ants
@@ -359,8 +370,7 @@ class Opt_Constraints:
     def phase_grad(self, params):
         """Constraint that phase gradient is zero
 
-        TODO:
-        2) does the phase gradient need to be made zero across all gains?
+        TODO: does the phase gradient need to be made zero across all gains?
         """
         deg_params = params[-4:] # set degenerate parameters at the end
         _, overall_phase, phase_grad_x, phase_grad_y = deg_params
@@ -394,48 +404,119 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: ndarray (1 element)
     """
-    w_alpha = degVis(ant_sep, rel_vis1, *params)
-
+    w_alpha = degVis(ant_sep, rel_vis1, *params[[0, 2, 3]])
     delta = rel_vis2 - w_alpha
-
     log_likelihood = LLFN[distribution](delta)
-
     return log_likelihood
 
-def doRedCal(redG, vis, m="cauchy"):
+
+def doRelCal(redg, obsvis, distribution='cauchy'):
+    """Do relative step of redundant calibration
+
+    Initial parameter guesses are 1+1j for both the gains and the true
+    sky visibilities.
+
+    :param redg: Grouped baselines, as returned by groupBls
+    :type redg: ndarray
+    :param obsvis: Observed sky visibilities for a given frequency and given time,
+    reformatted to have format consistent with redg
+    :type obsvis: ndarray
+    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :type distribution: str
+
+    :return: Optimization result for the solved antenna gains and true sky
+    visibilities
+    :rtype: Scipy optimization result object
     """
-    Do Redundant Calibration
-    """
-    # Finding all the antennas used in our flagged data
-    ants = numpy.unique(redG[:,1:])
-    no_unq_bls = numpy.unique(redG[:, 0]).size
     #Setup initial parameters
-    xvis = numpy.ones(no_unq_bls*2) # Number of unique baselines; complex vis
-    xgains = numpy.ones(ants.size*2) # Complex gain
-    initp= numpy.hstack([xvis, xgains])    
-    ff = jit(functools.partial(relative_logLkl,
-                               relabelAnts(redG),
-                               m, 
-                               vis))
-    res = scipy.optimize.minimize(ff,
-                                  initp,
-                                  jac=jacrev(ff))
-    print(res["message"])
+    ants = numpy.unique(redg[:, 1:])
+    no_unq_bls = numpy.unique(redg[:, 0]).size
+    xvis = numpy.ones(no_unq_bls*2) # Complex vis
+    xgains = numpy.ones(ants.size*2) # Complex gains
+    initp= numpy.hstack([xvis, xgains])
+
+    ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
+                               distribution, obsvis))
+    res = scipy.optimize.minimize(ff, initp, jac=jacrev(ff))
+    print(res['message'])
     return res
 
-def doDegVisVis(antSep, vis1, vis2):
-    """
-    Fit degenerate reundant calibration parameters so that vis1 is as
-    close to as possible to vis2
 
-    :return: Scipy optimisation result object
+def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
+    """Do optimal absolute step of redundant calibration
+
+    Initial degenerate parameter guesses are 1 for the overall amplitude, and 0
+    for the overall phase and the phase gradients in x and y.
+
+    :param redg: Grouped baselines, as returned by groupBls
+    :type redg: ndarray
+    :param obsvis: Observed sky visibilities for a given frequency and given time,
+    reformatted to have format consistent with redg
+    :type obsvis: ndarray
+    :param ant_pos: Dictionary of antenna position coordinates for the antennas
+    in ants
+    :type ant_pos: dict
+    :param rel_vis: Visibility solutions for redundant baseline groups after
+    relative calibration
+    :param rel_vis: ndarray
+    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :type distribution: str
+    :param ref_ant: Antenna number of reference antenna to constrain overall phase
+    :type ref_ant: int
+
+    :return: Optimization result for the optimally absolutely calibrated
+    redundant gains and degenerate parameters
+    :rtype: Scipy optimization result object
     """
-    initp = numpy.hstack([1, 0, 0, 0])
-    ff = jit(functools.partial(deg_logLkl, 'cauchy',
-                               antSep, 
-                               vis1, vis2))
-    res = scipy.optimize.minimize(ff,
-                                  initp,
-                                  jac=jacrev(ff))
-    print(res["message"])
+    #Setup initial parameters
+    ants = numpy.unique(redg[:,1:])
+    xgains = numpy.ones(ants.size*2) # Complex gains
+    xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase, and phase
+    # gradients in x and y
+    initp= numpy.hstack([xgains, *xdegparams])
+
+    # Constraints for optimization
+    constraints = Opt_Constraints(ants, ref_ant, hdraw.antpos)
+    cons = [{'type': 'eq', 'fun': constraints.avg_amp},
+            {'type': 'eq', 'fun': constraints.avg_phase},
+            {'type': 'eq', 'fun': constraints.ref_phase},
+            {'type': 'eq', 'fun': constraints.phase_grad}]
+
+    ant_sep = red_ant_sep(redg, ant_pos)
+    ff = jit(functools.partial(optimal_logLkl, relabelAnts(redg), distribution, \
+                               ant_sep, obsvis, rel_vis))
+    res_opt = scipy.optimize.minimize(ff, initp, constraints=cons, jac=jacrev(ff), \
+                                      method='trust-constr')
+    print(res_opt['message'])
+    return res
+
+
+def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy'):
+    """
+    Fit degenerate redundant calibration parameters so that rel_vis1 is as
+    close to as possible to rel_vis1
+
+    :param redg: Grouped baselines, as returned by groupBls
+    :type redg: ndarray
+    :param ant_pos: Dictionary of antenna position coordinates for the antennas
+    in ants
+    :type ant_pos: dict
+    :param rel_vis1: Visibility solutions for observation set 1 for redundant
+    baseline groups after relative calibration
+    :param rel_vis1: ndarray
+    :param rel_vis2: Visibility solutions for observation set 2 for redundant
+    baseline groups after relative calibration
+    :param rel_vis2: ndarray
+
+    :return: Optimization result for the solved degenerate parameters that
+    translat between the two datasets
+    :rtype: Scipy optimization result object
+    """
+    initp = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase, and
+    # phase gradients in x and y
+    ant_sep = red_ant_sep(redg, ant_pos)
+    ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
+                               rel_vis1, rel_vis2))
+    res = scipy.optimize.minimize(ff, initp, jac=jacrev(ff))
+    print(res['message'])
     return res
