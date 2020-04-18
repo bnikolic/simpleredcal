@@ -7,6 +7,8 @@ from scipy.optimize import minimize_scalar
 import pyuvdata
 from pyuvdata import utils as uvutils
 
+from red_likelihood import makeCArray
+
 
 def find_nearest(arr, val):
     """Find nearest value in array and its index
@@ -60,6 +62,44 @@ def lst_to_jd_time(lst, JD_day, telescope='HERA'):
 
     res = minimize_scalar(func, bounds=(0, 1), method='bounded')
     return res['x']
+
+
+def split_rel_results(res, no_unq_bls):
+    """Split results from minimization into visibility and gains arrays
+
+    :param res: Optimization result for the solved antenna gains and true sky
+    visibilities
+    :type res: Scipy optimization result object
+    :param no_unq_bls: Number of unique baselines / number of redundant visibilities
+    :type no_unq_bls: int
+
+    """
+    vis_params, gains_params = numpy.split(res['x'], [no_unq_bls*2,])
+    res_vis = makeCArray(vis_params)
+    res_gains = makeCArray(gains_params)
+    return res_vis, res_gains
+
+
+def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
+    """Pot visibility amplitudes or phases, grouped by redundant type
+
+    :param cdata: Grouped visibilities with format consistent with redg
+    :type cdata: ndarray
+    :param redg: Grouped baselines, as returned by groupBls
+    :type redg: ndarray
+    :param vis_type: Plot either visibility amplitude or phase {'amp', 'phase'}
+    :type vis_type: str
+    """
+    vis_calc = {'amp':numpy.abs, 'phase': numpy.angle}
+    bl_id_seperations = numpy.unique(redg[:, 0], return_index=True)[1][1:]
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.matshow(vis_calc[vis_type](cdata), aspect='auto')
+    for bl_id_seperation in bl_id_seperations:
+        plt.axvline(x=bl_id_seperation, color='white', linestyle='-.', linewidth=1)
+    ax.grid(False)
+    ax.set_xlabel('Baseline ID')
+    ax.set_ylabel('Time Integration')
+    plt.show()
 
 
 def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots',

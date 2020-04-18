@@ -229,6 +229,7 @@ LLFN = { 'cauchy' : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
          'gaussian' : lambda delta: np.square(np.abs(delta)).sum() }
 
 
+@jit
 def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     """Transform redundant visibilities according to the degenerate redundant
     parameters
@@ -437,7 +438,7 @@ def doRelCal(redg, obsvis, distribution='cauchy'):
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
                                distribution, obsvis))
-    res = scipy.optimize.minimize(ff, initp, jac=jacrev(ff))
+    res = minimize(ff, initp, jac=jacrev(ff))
     print(res['message'])
     return res
 
@@ -476,7 +477,7 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
     initp= numpy.hstack([xgains, *xdegparams])
 
     # Constraints for optimization
-    constraints = Opt_Constraints(ants, ref_ant, hdraw.antpos)
+    constraints = Opt_Constraints(ants, ref_ant, ant_pos)
     cons = [{'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},
             {'type': 'eq', 'fun': constraints.ref_phase},
@@ -485,9 +486,9 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(optimal_logLkl, relabelAnts(redg), distribution, \
                                ant_sep, obsvis, rel_vis))
-    res_opt = scipy.optimize.minimize(ff, initp, constraints=cons, jac=jacrev(ff), \
-                                      method='trust-constr')
-    print(res_opt['message'])
+    res = minimize(ff, initp, constraints=cons, jac=jacrev(ff), \
+                   method='trust-constr')
+    print(res['message'])
     return res
 
 
@@ -496,7 +497,8 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy'):
     Fit degenerate redundant calibration parameters so that rel_vis1 is as
     close to as possible to rel_vis1
 
-    :param redg: Grouped baselines, as returned by groupBls
+    :param redg: Grouped baselines, as returned by groupBls. These should be the
+    same for datasets 1 and 2.
     :type redg: ndarray
     :param ant_pos: Dictionary of antenna position coordinates for the antennas
     in ants
@@ -512,11 +514,11 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy'):
     translat between the two datasets
     :rtype: Scipy optimization result object
     """
-    initp = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase, and
-    # phase gradients in x and y
+    #Setup initial parameters: overall amplitude and phase, and x & y phase gradients
+    initp = np.asarray([1, 0, 0, 0])
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
-    res = scipy.optimize.minimize(ff, initp, jac=jacrev(ff))
+    res = minimize(ff, initp, jac=jacrev(ff))
     print(res['message'])
     return res
