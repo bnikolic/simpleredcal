@@ -1,5 +1,6 @@
 """Utility functions for robust redundant calibration"""
 
+
 import numpy
 from matplotlib import pyplot as plt
 from scipy.optimize import minimize_scalar
