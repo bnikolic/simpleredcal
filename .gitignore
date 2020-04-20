@@ -1,4 +1,5 @@
 .ipynb_checkpoints
 .gitignore
 .gitattributes
+__pycache__/
 test_nb.ipynb
