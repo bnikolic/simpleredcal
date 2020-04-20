@@ -13,7 +13,7 @@ from hera_cal.io import HERAData
 from hera_cal.redcal import get_reds
 
 from jax.config import config
-config.update("jax_enable_x64", True)
+config.update('jax_enable_x64', True)
 import jax
 from jax import jit, jacrev
 

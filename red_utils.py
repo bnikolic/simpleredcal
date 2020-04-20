@@ -1,6 +1,8 @@
 """Utility functions for robust redundant calibration"""
 
 
+import os
+
 import numpy
 from matplotlib import pyplot as plt
 from scipy.optimize import minimize_scalar
@@ -9,6 +11,31 @@ import pyuvdata
 from pyuvdata import utils as uvutils
 
 from red_likelihood import makeCArray
+
+
+def find_zen_file(JD_time):
+    """Returns path of selected JD_time
+    
+    :param JD_time: Julian date
+    :type JD_time: str
+    
+    :return: File path
+    :rtype: str
+    """
+    mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/robust_cal'
+    nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2'
+    fn = 'zen.{}.HH.uvh5'.format(JD_time)
+    jd_day = fn.split('.')[1]
+    if os.path.exists(mdm_dir):
+        fn = os.path.join(mdm_dir, fn)
+    elif os.path.exists(nrao_dir):
+        fn = os.path.join(nrao_dir, jd_day, fn)
+    else:
+        fn = './{}'.format(fn)
+        
+    if not os.path.exists(fn):
+        raise ValueError('Dataset {} not found'.format(fn))
+    return fn
 
 
 def find_nearest(arr, val):
