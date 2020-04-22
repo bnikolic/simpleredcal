@@ -1,5 +1,4 @@
 .ipynb_checkpoints
 __pycache__/
 test_nb.ipynb
-test_res.pkl
-test_res_df.pkl
+res_df.pkl
