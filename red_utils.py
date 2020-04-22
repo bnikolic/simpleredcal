@@ -2,6 +2,7 @@
 
 
 import os
+import pickle
 
 import numpy
 from matplotlib import pyplot as plt
@@ -15,27 +16,43 @@ from red_likelihood import makeCArray
 
 def find_zen_file(JD_time):
     """Returns path of selected JD_time
-    
-    :param JD_time: Julian date
+
+    :param JD_time: Fractional Julian date
     :type JD_time: str
-    
-    :return: File path
+
+    :return: File path of visibility dataset
     :rtype: str
     """
     mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/robust_cal'
     nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2'
-    fn = 'zen.{}.HH.uvh5'.format(JD_time)
-    jd_day = fn.split('.')[1]
+    zen_file = 'zen.{}.HH.uvh5'.format(JD_time)
+    jd_day = zen_file.split('.')[1]
     if os.path.exists(mdm_dir):
-        fn = os.path.join(mdm_dir, fn)
+        zen_path = os.path.join(mdm_dir, zen_file)
     elif os.path.exists(nrao_dir):
-        fn = os.path.join(nrao_dir, jd_day, fn)
+        zen_path = os.path.join(nrao_dir, jd_day, zen_file)
     else:
-        fn = './{}'.format(fn)
-        
-    if not os.path.exists(fn):
-        raise ValueError('Dataset {} not found'.format(fn))
-    return fn
+        zen_path = './{}'.format(zen_file)
+
+    if not os.path.exists(zen_path):
+        raise ValueError('Dataset {} not found'.format(zen_file))
+    return zen_path
+
+
+def get_bad_ants(zen_path):
+    """Find the corresponding bad antennas for the given IDR2 visibility
+     dataset
+
+    :param zen_path: File path of visibility dataset
+    :type zen_path: str
+
+    :return: Bad antennas
+    :rtype: ndarray
+     """
+    jd_day = int(os.path.basename(zen_path).split('.')[1])
+    with open('bad_ants_idr2.pkl', 'rb') as f:
+        bad_ants_dict = pickle.load(f)
+    return bad_ants_dict[jd_day]
 
 
 def find_nearest(arr, val):
