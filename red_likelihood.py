@@ -2,7 +2,6 @@
 
 
 import functools
-import itertools
 
 import numpy
 from matplotlib import pyplot as plt
@@ -90,8 +89,8 @@ def group_data(zen_path, pol, freq_chans, bad_ants):
     :type zen_path: str
     :param pol: Polarization of data
     :type pol: str
-    :param freq_chans: Frequency channel(s) {0, 1023}
-    :type freq_chans: int, array-like
+    :param freq_chans: Frequency channel(s) {0, 1023} (None to choose all)
+    :type freq_chans: array-like, or None
     :param bad_ants: Known bad antennas to flag
     :type bad_ants: array-like
 
@@ -101,27 +100,26 @@ def group_data(zen_path, pol, freq_chans, bad_ants):
     :rtype redg: ndarray
     :return cdata: Grouped visibilities with format consistent with redg and
     dimensions (freq chans, time integrations, baselines) - the 0th dimension
-    is non-existent if only 1 frequency channel is specified
+    only has 1 element if only 1 frequency channel is specified
     :rtype cdata: ndarray
     """
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
-    if isinstance(freq_chans, int):
-        freq_chans = [freq_chans]
+    # if isinstance(freq_chans, int):
+    #     freq_chans = [freq_chans]
     data, flags, nsamples = hd.read(freq_chans=freq_chans)
     flt_bls = fltBad(reds, bad_ants)
     redg = groupBls(flt_bls) # Baseline grouping
-    time_ints = data[list(data.keys())[0]].shape[0]
+    no_tints, no_chans = data[list(data.keys())[0]].shape
+    if freq_chans is None:
+        freq_chans = numpy.arange(no_chans)
 
     # Collect data together
-    if len(freq_chans) > 1:
-        cdata = numpy.empty((len(freq_chans), time_ints, redg.shape[0]), \
-                            dtype=complex)
-        for idx in range(len(freq_chans)):
-            cdata[idx, ...] = numpy.hstack([data[(*bl_row[1:], pol)][:, idx, \
-                                            numpy.newaxis] for bl_row in redg])
-    else:
-        cdata = numpy.hstack([data[(*bl_row[1:], pol)] for bl_row in redg])
+    cdata = numpy.empty((len(freq_chans), no_tints, redg.shape[0]), \
+                        dtype=complex)
+    for idx in range(len(freq_chans)):
+        cdata[idx, ...] = numpy.hstack([data[(*bl_row[1:], pol)][:, idx, \
+                                        numpy.newaxis] for bl_row in redg])
     return hd, redg, cdata
 
 
@@ -445,7 +443,7 @@ def doRelCal(redg, obsvis, distribution='cauchy'):
     no_unq_bls = numpy.unique(redg[:, 0]).size
     xvis = numpy.ones(no_unq_bls*2) # Complex vis
     xgains = numpy.ones(ants.size*2) # Complex gains
-    initp= numpy.hstack([xvis, xgains])
+    initp = numpy.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
                                distribution, obsvis))
