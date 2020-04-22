@@ -83,34 +83,45 @@ def relabelAnts(redg):
     return redg
 
 
-def group_data(fn, pol, freq_chan, bad_ants):
+def group_data(zen_path, pol, freq_chans, bad_ants):
     """Returns redundant baseline grouping and reformatted dataset
 
-    :param fn: Filename of uvh5 dataset
-    :type fn: str
+    :param zen_path: Path of uvh5 dataset
+    :type zen_path: str
     :param pol: Polarization of data
     :type pol: str
-    :param freq_chan: Frequency channel(s) {0, 1023}
-    :type freq_chan: int, list
+    :param freq_chans: Frequency channel(s) {0, 1023}
+    :type freq_chans: int, array-like
     :param bad_ants: Known bad antennas to flag
-    :type bad_ants: list
+    :type bad_ants: array-like
 
     :return hd: HERAData class
     :rtype hd: HERAData class
     :return redg: Grouped baselines, as returned by groupBls
     :rtype redg: ndarray
-    :return cdata: Grouped visibilities with format consistent with redg
+    :return cdata: Grouped visibilities with format consistent with redg and
+    dimensions (freq chans, time integrations, baselines) - the 0th dimension
+    is non-existent if only 1 frequency channel is specified
     :rtype cdata: ndarray
     """
-    hd = HERAData(fn)
+    hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
-    if isinstance(freq_chan, int):
-        freq_chan = [freq_chan]
-    data, flags, nsamples = hd.read(freq_chans=freq_chan)
+    if isinstance(freq_chans, int):
+        freq_chans = [freq_chans]
+    data, flags, nsamples = hd.read(freq_chans=freq_chans)
     flt_bls = fltBad(reds, bad_ants)
     redg = groupBls(flt_bls) # Baseline grouping
-    cdata = numpy.hstack([data[(bl_row[1], bl_row[2], 'ee')] for bl_row in
-            redg]) # Collect data together
+    time_ints = data[list(data.keys())[0]].shape[0]
+
+    # Collect data together
+    if len(freq_chans) > 1:
+        cdata = numpy.empty((len(freq_chans), time_ints, redg.shape[0]), \
+                            dtype=complex)
+        for idx in range(len(freq_chans)):
+            cdata[idx, ...] = numpy.hstack([data[(*bl_row[1:], pol)][:, idx, \
+                                            numpy.newaxis] for bl_row in redg])
+    else:
+        cdata = numpy.hstack([data[(*bl_row[1:], pol)] for bl_row in redg])
     return hd, redg, cdata
 
 
