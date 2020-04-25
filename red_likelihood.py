@@ -345,6 +345,8 @@ class Opt_Constraints:
     :param ant_pos: Dictionary of antenna position coordinates for the antennas
     in ants
     :type ant_pos: dict
+    :param params: Parameters to feed into optimal absolute calibration
+    :type params: ndarray
     """
     def __init__(self, ants, ref_ant, ant_pos):
         self.ants = ants
@@ -353,22 +355,38 @@ class Opt_Constraints:
 
     def get_rel_gains(self, params):
         """Returns the complex relative gain parameters from the flattened array
-        of parameters"""
+        of parameters
+
+        :return: Relative gain parameters in complex array format
+        :rtype: ndarray
+        """
         rel_gains_comps = params[:self.ants.size*2]
         return makeCArray(rel_gains_comps)
 
     def avg_amp(self, params):
-        """Constraint that average of gain amplitudes must be equal to 1"""
+        """Constraint that average of gain amplitudes must be equal to 1
+
+        :return: Residual between average gain amplitudes and 1
+        :rtype: float
+        """
         rel_gains = self.get_rel_gains(params)
         return np.average(np.abs(rel_gains)) - 1
 
     def avg_phase(self, params):
-        """Constraint that average of gain phases must be equal to 0"""
+        """Constraint that circular mean of gain phases must be equal to 0
+
+        :return: Residual between circular mean of gain phases and 0
+        :rtype: float
+        """
         rel_gains = self.get_rel_gains(params)
         return stats.circmean(np.angle(rel_gains))
 
     def ref_phase(self, params):
-        """Set argument of reference antenna to zero to set overall phase"""
+        """Set argument of reference antenna gain to zero to set overall phase
+
+        :return: Residual between referance antenna phase and 0
+        :rtype: float
+        """
         rel_gains = self.get_rel_gains(params)
         ref_ant_idx = condenseMap(self.ants)[self.ref_ant]
         return np.angle(rel_gains[ref_ant_idx])
@@ -377,6 +395,9 @@ class Opt_Constraints:
         """Constraint that phase gradient is zero
 
         TODO: does the phase gradient need to be made zero across all gains?
+
+        :return: Residual between phase gradient and 0
+        :rtype: float
         """
         deg_params = params[-4:] # set degenerate parameters at the end
         _, overall_phase, phase_grad_x, phase_grad_y = deg_params
