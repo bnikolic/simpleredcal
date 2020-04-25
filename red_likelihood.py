@@ -16,7 +16,7 @@ config.update('jax_enable_x64', True)
 import jax
 from jax import jit, jacrev
 
-# NB. Where "numpy" is used below it has to be real numpy. "np" can be
+# NB. Where 'numpy' is used below it has to be real numpy. 'np' can be
 # either jax or real numpy
 np=jax.np
 
@@ -105,8 +105,6 @@ def group_data(zen_path, pol, freq_chans, bad_ants):
     """
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
-    # if isinstance(freq_chans, int):
-    #     freq_chans = [freq_chans]
     data, flags, nsamples = hd.read(freq_chans=freq_chans)
     flt_bls = fltBad(reds, bad_ants)
     redg = groupBls(flt_bls) # Baseline grouping
@@ -233,7 +231,6 @@ def gVis(vis, redg, gains):
     return vis[redg[:, 0]]*gains[redg[:, 1]]*np.conj(gains[redg[:, 2]])
 
 
-# Could also put these in a module and then use getattr
 LLFN = { 'cauchy' : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
          'gaussian' : lambda delta: np.square(np.abs(delta)).sum() }
 
@@ -349,7 +346,6 @@ class Opt_Constraints:
     in ants
     :type ant_pos: dict
     """
-
     def __init__(self, ants, ref_ant, ant_pos):
         self.ants = ants
         self.ref_ant = ref_ant
@@ -481,8 +477,8 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
     #Setup initial parameters
     ants = numpy.unique(redg[:,1:])
     xgains = numpy.ones(ants.size*2) # Complex gains
-    xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase, and phase
-    # gradients in x and y
+    xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase,
+    # and phase gradients in x and y
     initp= numpy.hstack([xgains, *xdegparams])
 
     # Constraints for optimization
