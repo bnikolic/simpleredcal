@@ -125,6 +125,21 @@ def split_rel_results(res, no_unq_bls):
     return res_vis, res_gains
 
 
+def norm_residuals(x_meas, x_pred):
+    """Evaluates the residual between the measured and predicted quantities,
+    normalized by the absolute value of their product
+
+    :param x_meas: Measurement
+    :type x_meas: ndarray
+    :param x_pred: Prediction
+    :type x_pred: ndarray
+
+    :return: Normalized residual
+    :rtype: ndarray
+    """
+    return (x_meas - x_pred) / numpy.sqrt(numpy.abs(x_meas)*numpy.abs(x_meas))
+
+
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     """Pot visibility amplitudes or phases, grouped by redundant type
 
