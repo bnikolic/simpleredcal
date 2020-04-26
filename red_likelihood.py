@@ -82,15 +82,15 @@ def relabelAnts(redg):
     return redg
 
 
-def group_data(zen_path, pol, freq_chans, bad_ants):
+def group_data(zen_path, pol, chans, bad_ants):
     """Returns redundant baseline grouping and reformatted dataset
 
     :param zen_path: Path of uvh5 dataset
     :type zen_path: str
     :param pol: Polarization of data
     :type pol: str
-    :param freq_chans: Frequency channel(s) {0, 1023} (None to choose all)
-    :type freq_chans: array-like, or None
+    :param chans: Frequency channel(s) {0, 1023} (None to choose all)
+    :type chans: array-like, int, or None
     :param bad_ants: Known bad antennas to flag
     :type bad_ants: array-like
 
@@ -105,17 +105,19 @@ def group_data(zen_path, pol, freq_chans, bad_ants):
     """
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
-    data, flags, nsamples = hd.read(freq_chans=freq_chans)
+    if isinstance(chans, int):
+        chans = [chans]
+    data, flags, nsamples = hd.read(freq_chans=chans)
     flt_bls = fltBad(reds, bad_ants)
     redg = groupBls(flt_bls) # Baseline grouping
     no_tints, no_chans = data[list(data.keys())[0]].shape
-    if freq_chans is None:
-        freq_chans = numpy.arange(no_chans)
+    if chans is None:
+        chans = numpy.arange(no_chans)
 
     # Collect data together
-    cdata = numpy.empty((len(freq_chans), no_tints, redg.shape[0]), \
+    cdata = numpy.empty((len(chans), no_tints, redg.shape[0]), \
                         dtype=complex)
-    for idx in range(len(freq_chans)):
+    for idx in range(len(chans)):
         cdata[idx, ...] = numpy.hstack([data[(*bl_row[1:], pol)][:, idx, \
                                         numpy.newaxis] for bl_row in redg])
     return hd, redg, cdata
@@ -437,7 +439,7 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     return log_likelihood
 
 
-def doRelCal(redg, obsvis, distribution='cauchy'):
+def doRelCal(redg, obsvis, distribution='cauchy', initp=None):
     """Do relative step of redundant calibration
 
     Initial parameter guesses are 1+1j for both the gains and the true
@@ -450,17 +452,20 @@ def doRelCal(redg, obsvis, distribution='cauchy'):
     :type obsvis: ndarray
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
+    :param initp: Initial parameter guesses for true visibilities and gains
+    :type initp: ndarray, None
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
     :rtype: Scipy optimization result object
     """
-    #Setup initial parameters
-    ants = numpy.unique(redg[:, 1:])
-    no_unq_bls = numpy.unique(redg[:, 0]).size
-    xvis = numpy.ones(no_unq_bls*2) # Complex vis
-    xgains = numpy.ones(ants.size*2) # Complex gains
-    initp = numpy.hstack([xvis, xgains])
+    if initp is None:
+        #Setup initial parameters
+        ants = numpy.unique(redg[:, 1:])
+        no_unq_bls = numpy.unique(redg[:, 0]).size
+        xvis = numpy.ones(no_unq_bls*2) # Complex vis
+        xgains = numpy.ones(ants.size*2) # Complex gains
+        initp = numpy.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
                                distribution, obsvis))
@@ -469,7 +474,8 @@ def doRelCal(redg, obsvis, distribution='cauchy'):
     return res
 
 
-def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
+def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, \
+             initp=None):
     """Do optimal absolute step of redundant calibration
 
     Initial degenerate parameter guesses are 1 for the overall amplitude, and 0
@@ -490,17 +496,20 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
     :type distribution: str
     :param ref_ant: Antenna number of reference antenna to constrain overall phase
     :type ref_ant: int
+    :param initp: Initial parameter guesses for gains and degenerate parameters
+    :type initp: ndarray, None
 
     :return: Optimization result for the optimally absolutely calibrated
     redundant gains and degenerate parameters
     :rtype: Scipy optimization result object
     """
-    #Setup initial parameters
-    ants = numpy.unique(redg[:,1:])
-    xgains = numpy.ones(ants.size*2) # Complex gains
-    xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase,
-    # and phase gradients in x and y
-    initp= numpy.hstack([xgains, *xdegparams])
+    if initp is None:
+        #Setup initial parameters
+        ants = numpy.unique(redg[:,1:])
+        xgains = numpy.ones(ants.size*2) # Complex gains
+        xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase,
+        # and phase gradients in x and y
+        initp= numpy.hstack([xgains, *xdegparams])
 
     # Constraints for optimization
     constraints = Opt_Constraints(ants, ref_ant, ant_pos)
@@ -518,7 +527,8 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12):
     return res
 
 
-def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy'):
+def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
+                initp=None):
     """
     Fit degenerate redundant calibration parameters so that rel_vis1 is as
     close to as possible to rel_vis1
@@ -535,13 +545,18 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy'):
     :param rel_vis2: Visibility solutions for observation set 2 for redundant
     baseline groups after relative calibration
     :param rel_vis2: ndarray
+    :param initp: Initial parameter guesses for degenerate parameters
+    :type initp: ndarray, None
 
     :return: Optimization result for the solved degenerate parameters that
     translat between the two datasets
     :rtype: Scipy optimization result object
     """
-    #Setup initial parameters: overall amplitude and phase, and x & y phase gradients
-    initp = np.asarray([1, 0, 0, 0])
+    if initp is None:
+        #Setup initial parameters: overall amplitude, overall phase, and x and y
+        # phase gradients
+        initp = np.asarray([1, 0, 0, 0])
+
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))

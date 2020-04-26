@@ -4,7 +4,6 @@ and time"""
 
 import argparse
 import os
-import pickle
 import textwrap
 
 import pandas as pd
@@ -73,8 +72,11 @@ def main():
         time_ints = numpy.arange(cData.shape[1])
     res_dict = {}
     with open(os.devnull, 'w'):
+        initp = None
         for iter_dim in numpy.ndindex(cData[:, time_ints, :].shape[:2]):
-            res_rel = doRelCal(cRedG, cData[iter_dim], distribution='cauchy')
+            res_rel = doRelCal(cRedG, cData[iter_dim], distribution='cauchy', \
+                               initp=initp)
+            initp = res_rel['x'] # use solution for next solve in iteration
             res_dict[iter_dim] = res_rel
 
     df = pd.DataFrame.from_dict(res_dict, orient='index')
