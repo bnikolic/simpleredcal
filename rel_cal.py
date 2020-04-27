@@ -85,6 +85,8 @@ def main():
 
     hdraw, cRedG, cData = group_data(filename, pol, freq_chans, bad_ants)
 
+    if freq_chans is None:
+        freq_chans = numpy.arange(cData.shape[0])
     if time_ints is None:
         time_ints = numpy.arange(cData.shape[1])
     res_dict = {}
