@@ -1,5 +1,9 @@
 """Batch relative redundant calibration of visibilities across frequencies
-and time"""
+and time
+
+example run:
+$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1
+"""
 
 
 import argparse
