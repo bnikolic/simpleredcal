@@ -71,8 +71,9 @@ def main():
     out_df = fn_format(args.out_df, ext)
     if os.path.exists(out_df):
         if not args.overwrite:
+            bn = os.path.splitext(out_df)[0]
             dt = datetime.datetime.now().strftime('%Y_%m_%d.%H_%M_%S')
-            out_df = '{}.{}.{}'.format(os.path.splitext(out_df)[0], dt, ext)
+            out_df = '{}.{}.{}.{}'.format(bn, args.jd_time, dt, ext)
 
     filename = find_zen_file(args.jd_time)
     bad_ants = get_bad_ants(filename)
