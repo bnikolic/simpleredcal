@@ -39,6 +39,23 @@ def find_zen_file(JD_time):
     return zen_path
 
 
+def fn_format(fn, format):
+    """Format file name to have correct file extension
+
+    :param figname: File name
+    :type figname: str
+    :param format: File format
+    :type format: str
+
+    :return: Formatted figure name
+    :rtype: str
+    """
+    ext = '.{}'.format(format)
+    if not fn.endswith(ext):
+        fn = fn + ext
+    return fn
+
+
 def get_bad_ants(zen_path):
     """Find the corresponding bad antennas for the given IDR2 visibility
      dataset

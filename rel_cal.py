@@ -7,6 +7,7 @@ $ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1
 
 
 import argparse
+import datetime
 import os
 import textwrap
 
@@ -14,7 +15,7 @@ import pandas as pd
 import numpy
 
 from red_likelihood import doRelCal, group_data
-from red_utils import find_zen_file, get_bad_ants
+from red_utils import find_zen_file, fn_format, get_bad_ants
 
 
 def mod_str_arg(str_arg):
@@ -52,7 +53,7 @@ def main():
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
                         calibrate', metavar='JD')
-    parser.add_argument('--out_df', required=False, default='res_df', \
+    parser.add_argument('--out_df', required=False, default='res_df.pkl', \
                         metavar='O', type=str, help='Output dataframe name')
     parser.add_argument('--pol', required=True, metavar='pol', type=str, \
                         help='Polarization {"ee", "en", "nn", "ne"}')
@@ -62,7 +63,16 @@ def main():
     parser.add_argument('--tints', required=False, default=None, metavar='T',
                         type=str, help='Time integrations to calibrate \
                         {0, 59}')
+    parser.add_argument('--overwrite', required=False, default=False, metavar='O',
+                        type=bool, help='Overwrite existing dataframe')
     args = parser.parse_args()
+
+    ext = 'pkl'
+    out_df = fn_format(args.out_df, ext)
+    if os.path.exists(out_df):
+        if not args.overwrite:
+            dt = datetime.datetime.now().strftime('%Y_%m_%d.%H_%M_%S')
+            out_df = '{}.{}.{}'.format(os.path.splitext(out_df)[0], dt, ext)
 
     filename = find_zen_file(args.jd_time)
     bad_ants = get_bad_ants(filename)
@@ -87,7 +97,7 @@ def main():
     df[['freq', 'time_int']] = pd.DataFrame(df.index.tolist(), index=df.index)
     df.reset_index(drop=True, inplace=True)
     df.set_index(['freq', 'time_int'], inplace=True)
-    df.to_pickle('./{}.pkl'.format(args.out_df))
+    df.to_pickle(out_df)
     print('Relative calibration results saved to dataframe')
 
 
