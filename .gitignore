@@ -2,3 +2,4 @@
 __pycache__/
 test_nb.ipynb
 res_df*.pkl
+run_rel_cal.sh.*
