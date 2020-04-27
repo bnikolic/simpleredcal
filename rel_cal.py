@@ -67,12 +67,14 @@ def main():
                         type=bool, help='Overwrite existing dataframe')
     args = parser.parse_args()
 
+    startTime = datetime.datetime.now()
+
     ext = 'pkl'
     out_df = fn_format(args.out_df, ext)
     if os.path.exists(out_df):
         if not args.overwrite:
             bn = os.path.splitext(out_df)[0]
-            dt = datetime.datetime.now().strftime('%Y_%m_%d.%H_%M_%S')
+            dt = startTime.strftime('%Y_%m_%d.%H_%M_%S')
             out_df = '{}.{}.{}.{}'.format(bn, args.jd_time, dt, ext)
 
     filename = find_zen_file(args.jd_time)
@@ -100,6 +102,7 @@ def main():
     df.set_index(['freq', 'time_int'], inplace=True)
     df.to_pickle(out_df)
     print('Relative calibration results saved to dataframe')
+    print('Script run time: {}'.format(datetime.datetime.now() - startTime))
 
 
 if __name__ == '__main__':
