@@ -57,14 +57,14 @@ def main():
                         metavar='O', type=str, help='Output dataframe name')
     parser.add_argument('--pol', required=True, metavar='pol', type=str, \
                         help='Polarization {"ee", "en", "nn", "ne"}')
-    parser.add_argument('--chans', required=False, default=None, metavar='C',
+    parser.add_argument('--chans', required=False, default=None, metavar='C', \
                         type=str, help='Frequency channels to calibrate \
                         {0, 1023}')
-    parser.add_argument('--tints', required=False, default=None, metavar='T',
+    parser.add_argument('--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to calibrate \
                         {0, 59}')
-    parser.add_argument('--overwrite', required=False, default=False, metavar='O',
-                        type=bool, help='Overwrite existing dataframe')
+    parser.add_argument('--overwrite', required=False, action='store_true', \
+                        help='Overwrite existing dataframe')
     args = parser.parse_args()
 
     startTime = datetime.datetime.now()
@@ -94,7 +94,7 @@ def main():
             res_rel = doRelCal(cRedG, cData[iter_dim], distribution='cauchy', \
                                initp=initp)
             initp = res_rel['x'] # use solution for next solve in iteration
-            res_dict[iter_dim] = res_rel
+            res_dict[freq_chans[iter_dim[0]], iter_dim[1]] = res_rel
 
     df = pd.DataFrame.from_dict(res_dict, orient='index')
     df[['freq', 'time_int']] = pd.DataFrame(df.index.tolist(), index=df.index)
