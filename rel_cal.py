@@ -2,14 +2,16 @@
 and time
 
 example run:
-$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1
+$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1 --overwrite
 """
 
 
 import argparse
 import datetime
+import io
 import os
 import textwrap
+from contextlib import redirect_stdout
 
 import pandas as pd
 import numpy
@@ -90,7 +92,8 @@ def main():
     if time_ints is None:
         time_ints = numpy.arange(cData.shape[1])
     res_dict = {}
-    with open(os.devnull, 'w'):
+    stdout = io.StringIO()
+    with redirect_stdout(stdout): # suppress output
         initp = None
         for iter_dim in numpy.ndindex(cData[:, time_ints, :].shape[:2]):
             res_rel = doRelCal(cRedG, cData[iter_dim], distribution='cauchy', \
