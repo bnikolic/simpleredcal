@@ -154,7 +154,7 @@ def norm_residuals(x_meas, x_pred):
     :return: Normalized residual
     :rtype: ndarray
     """
-    return (x_meas - x_pred) / numpy.sqrt(numpy.abs(x_meas)*numpy.abs(x_meas))
+    return (x_meas - x_pred) / numpy.sqrt(numpy.abs(x_meas)*numpy.abs(x_pred))
 
 
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
