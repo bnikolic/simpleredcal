@@ -217,20 +217,24 @@ def makeCArray(arr):
 
 
 @jit
-def gVis(vis, redg, gains):
+def gVis(vis, cRedG, gains):
     """Apply gains to visibilities
 
     :param vis: visibilities
     :type vis: ndarray
-    :param redg: Grouped baselines, as returned by groupBls
+
+    :param cRedG: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+
     :type redg: ndarray
     :param gains: Antenna gains
     :type gains: ndarray
 
     :return: Modified visibilities by applying antenna gains
     :rtype: ndarray
+
     """
-    return vis[redg[:, 0]]*gains[redg[:, 1]]*np.conj(gains[redg[:, 2]])
+    return vis[cRedG[:, 0]]*gains[cRedG[:, 1]]*np.conj(gains[cRedG[:, 2]])
 
 
 LLFN = { 'cauchy' : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
