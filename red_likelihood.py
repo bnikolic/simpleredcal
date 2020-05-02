@@ -217,16 +217,15 @@ def makeCArray(arr):
 
 
 @jit
-def gVis(vis, cRedG, gains):
+def gVis(vis, credg, gains):
     """Apply gains to visibilities
 
     :param vis: visibilities
     :type vis: ndarray
 
-    :param cRedG: Grouped baselines, condensed so that antennas are
+    :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
-
-    :type redg: ndarray
+    :type credg: ndarray
     :param gains: Antenna gains
     :type gains: ndarray
 
@@ -234,7 +233,7 @@ def gVis(vis, cRedG, gains):
     :rtype: ndarray
 
     """
-    return vis[cRedG[:, 0]]*gains[cRedG[:, 1]]*np.conj(gains[cRedG[:, 2]])
+    return vis[credg[:, 0]]*gains[credg[:, 1]]*np.conj(gains[credg[:, 2]])
 
 
 LLFN = { 'cauchy' : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
@@ -268,7 +267,7 @@ def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     return w_alpha
 
 
-def relative_logLkl(redg, distribution, obsvis, params):
+def relative_logLkl(credg, distribution, obsvis, params):
     """Redundant relative likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -277,12 +276,13 @@ def relative_logLkl(redg, distribution, obsvis, params):
 
     Note: parameter order is such that the function can be usefully partially applied.
 
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
     :param obsvis: Observed sky visibilities for a given frequency and given time,
-    reformatted to have format consistent with redg
+    reformatted to have format consistent with credg
     :type obsvis: ndarray
     :param params: Parameters to constrain: redundant visibilities and gains
     :type params: ndarray
@@ -290,29 +290,30 @@ def relative_logLkl(redg, distribution, obsvis, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: ndarray (1 element)
     """
-    NRedVis = redg[:, 0].max().item() + 1
+    NRedVis = credg[:, 0].max().item() + 1
     vis_comps, gains_comps = np.split(params, [NRedVis*2, ])
     vis = makeCArray(vis_comps)
     gains = makeCArray(gains_comps)
 
-    delta = obsvis - gVis(vis, redg, gains)
+    delta = obsvis - gVis(vis, credg, gains)
     log_likelihood = LLFN[distribution](delta)
     return log_likelihood
 
 
-def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
+def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, params):
     """Optimal likelihood calculator
 
     We solve for the degeneracies in redundant calibration. This must be done
     after relative redundant calibration. We also set the noise for each visibility
     to be 1.
 
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
     :param obsvis: Observed sky visibilities for a given frequency and given time,
-    reformatted to have format consistent with redg
+    reformatted to have format consistent with credg
     :type obsvis: ndarray
     :param ant_sep: Antenna seperation for baseline types
     :type ant_sep: ndarray
@@ -326,12 +327,12 @@ def optimal_logLkl(redg, distribution, ant_sep, obsvis, rel_vis, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: ndarray (1 element)
      """
-    NAnts = redg[:, 1:].max().item() + 1
+    NAnts = credg[:, 1:].max().item() + 1
     rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
     rel_gains = makeCArray(rel_gains_comps)
 
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
-    delta = obsvis - gVis(w_alpha, redg, rel_gains)
+    delta = obsvis - gVis(w_alpha, credg, rel_gains)
     log_likelihood = LLFN[distribution](delta)
     return log_likelihood
 
@@ -509,7 +510,7 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     """
     if initp is None:
         #Setup initial parameters
-        ants = numpy.unique(redg[:,1:])
+        ants = numpy.unique(redg[:, 1:])
         xgains = numpy.ones(ants.size*2) # Complex gains
         xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase,
         # and phase gradients in x and y
