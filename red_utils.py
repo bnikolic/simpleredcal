@@ -157,6 +157,18 @@ def norm_residuals(x_meas, x_pred):
     return (x_meas - x_pred) / numpy.sqrt(numpy.abs(x_meas)*numpy.abs(x_pred))
 
 
+def abs_residuals(residuals):
+    """Return median absolute residuals for both real and imag parts
+
+    :param residuals: Residuals
+    :type residuals: ndarray
+
+    :return: Median absolute residuals, separately for Re and Im
+    :rtype: list
+    """
+    return [numpy.median(numpy.absolute(getattr(residuals, i))) \
+            for i in ('real', 'imag')]
+
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     """Pot visibility amplitudes or phases, grouped by redundant type
 
