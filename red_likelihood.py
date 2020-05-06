@@ -6,7 +6,7 @@ import functools
 import numpy
 from matplotlib import pyplot as plt
 from scipy import stats as stats
-from scipy.optimize import minimize
+from scipy.optimize import Bounds, minimize
 
 from hera_cal.io import HERAData
 from hera_cal.redcal import get_reds
@@ -151,7 +151,7 @@ def red_ant_pos(redg, ant_pos):
     :type ant_pos: dict
 
     :return: Array of position coordinates of the baselines that define the
-    redundant sets
+    redundant sets. Dimensions are (baseline, (ant1, ant2), coordinates)
     :rtype: ndarray
     """
     redbl_types = redblMap(redg)
@@ -163,7 +163,7 @@ def red_ant_pos(redg, ant_pos):
 def red_ant_sep(redg, ant_pos):
     """Return seperation of the antennas that define a redundant group
 
-    Seperation defined to be antenna 2 minus antenna 1 in antenna pair
+    Seperation defined to be antenna 1 minus antenna 2 in antenna pair
 
     :param redg: Grouped baselines, as returned by groupBls
     :type redg: ndarray
@@ -174,7 +174,7 @@ def red_ant_sep(redg, ant_pos):
     :rtype: ndarray
     """
     redant_positions = red_ant_pos(redg, ant_pos)
-    redant_seperation = redant_positions[:, 1, :] - redant_positions[:, 0, :]
+    redant_seperation = redant_positions[:, 0, :] - redant_positions[:, 1, :]
     return redant_seperation
 
 
@@ -231,13 +231,12 @@ def gVis(vis, credg, gains):
 
     :return: Modified visibilities by applying antenna gains
     :rtype: ndarray
-
     """
     return vis[credg[:, 0]]*gains[credg[:, 1]]*np.conj(gains[credg[:, 2]])
 
 
-LLFN = { 'cauchy' : lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
-         'gaussian' : lambda delta: np.square(np.abs(delta)).sum() }
+LLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
+        'gaussian':lambda delta: np.square(np.abs(delta)).sum()}
 
 
 @jit
@@ -355,10 +354,15 @@ class Opt_Constraints:
     :param params: Parameters to feed into optimal absolute calibration
     :type params: ndarray
     """
-    def __init__(self, ants, ref_ant, ant_pos):
+    def __init__(self, ants, ref_ant, ant_pos, redg):
         self.ants = ants
         self.ref_ant = ref_ant
         self.ant_pos = ant_pos
+        self.redg = redg
+        self.ref_ant_idx = condenseMap(self.ants)[self.ref_ant]
+        self.cmap = condenseMap(self.redg[:, 1:3])
+        self.x_pos = np.asarray([self.ant_pos[ant_no][0] for ant_no in self.cmap.keys()])
+        self.y_pos = np.asarray([self.ant_pos[ant_no][1] for ant_no in self.cmap.keys()])
 
     def get_rel_gains(self, params):
         """Returns the complex relative gain parameters from the flattened array
@@ -389,29 +393,45 @@ class Opt_Constraints:
         return stats.circmean(np.angle(rel_gains))
 
     def ref_phase(self, params):
-        """Set argument of reference antenna gain to zero to set overall phase
+        """Set phase of reference antenna gain to 0 to set overall phase
 
         :return: Residual between referance antenna phase and 0
         :rtype: float
         """
         rel_gains = self.get_rel_gains(params)
-        ref_ant_idx = condenseMap(self.ants)[self.ref_ant]
-        return np.angle(rel_gains[ref_ant_idx])
+        return np.angle(rel_gains[self.ref_ant_idx])
 
-    def phase_grad(self, params):
-        """Constraint that phase gradient is zero
+    def ref_amp(self, params):
+        """Set amplitude of reference antenna gain to 1 to set overall amplitude
 
-        TODO: does the phase gradient need to be made zero across all gains?
-
-        :return: Residual between phase gradient and 0
+        :return: Residual between referance antenna amplitude and 1
         :rtype: float
         """
-        deg_params = params[-4:] # set degenerate parameters at the end
-        _, overall_phase, phase_grad_x, phase_grad_y = deg_params
-        x_ant_ref_pos, y_ant_ref_pos = self.ant_pos[self.ref_ant][:2]
-        phase_gradient = overall_phase + (x_ant_ref_pos * phase_grad_x) + \
-                         (y_ant_ref_pos * phase_grad_y)
-        return phase_gradient
+        rel_gains = self.get_rel_gains(params)
+        return np.absolute(rel_gains[self.ref_ant_idx]) - 1
+
+    def phase_grad_x(self, params):
+        """Constraint that phase gradient in x is 0
+
+        :return: Residual between phase gradient in x and 0
+        :rtype: float
+        """
+        rel_gains = self.get_rel_gains(params)
+        phases = np.angle(rel_gains)
+        # wrapping phases between -pi and pi - is this required?
+        wrapped_phases = (phases + np.pi) % (2*np.pi) - np.pi
+        return np.sum(wrapped_phases*self.x_pos)
+
+    def phase_grad_y(self, params):
+        """Constraint that phase gradient in y is 0
+
+        :return: Residual between phase gradient in y and 0
+        :rtype: float
+        """
+        rel_gains = self.get_rel_gains(params)
+        phases = np.angle(rel_gains)
+        wrapped_phases = (phases + np.pi) % (2*np.pi) - np.pi
+        return np.sum(wrapped_phases*self.y_pos)
 
 
 def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
@@ -508,26 +528,34 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     redundant gains and degenerate parameters
     :rtype: Scipy optimization result object
     """
+    ants = numpy.unique(redg[:, 1:])
     if initp is None:
         #Setup initial parameters
-        ants = numpy.unique(redg[:, 1:])
         xgains = numpy.ones(ants.size*2) # Complex gains
         xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase,
         # and phase gradients in x and y
         initp= numpy.hstack([xgains, *xdegparams])
 
+    lb = numpy.repeat(-numpy.inf, initp.size)
+    ub = numpy.repeat(numpy.inf, initp.size)
+    lb[-4] = 0 # lower bound for overall amplitude
+    bounds = Bounds(lb, ub)
+
     # Constraints for optimization
-    constraints = Opt_Constraints(ants, ref_ant, ant_pos)
+    constraints = Opt_Constraints(ants, ref_ant, ant_pos, redg)
     cons = [{'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},
             {'type': 'eq', 'fun': constraints.ref_phase},
-            {'type': 'eq', 'fun': constraints.phase_grad}]
+            {'type': 'eq', 'fun': constraints.ref_amp},
+            {'type': 'eq', 'fun': constraints.phase_grad_x},
+            {'type': 'eq', 'fun': constraints.phase_grad_y}
+            ]
 
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(optimal_logLkl, relabelAnts(redg), distribution, \
                                ant_sep, obsvis, rel_vis))
     res = minimize(ff, initp, constraints=cons, jac=jacrev(ff), \
-                   method='trust-constr')
+                   method='trust-constr', bounds=bounds)
     print(res['message'])
     return res
 
