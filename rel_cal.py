@@ -3,6 +3,17 @@ and time
 
 example run:
 $ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1 --overwrite
+
+Can then read the dataframe with:
+> pd.read_pickle('res_df.pkl')
+
+TODO:
+- Iteratively appending rows to a DataFrame can be more computationally
+intensive than a single concatenate. A better solution is to append those rows
+to a list and then concatenate the list with the original DataFrame all at once.
+    -> do this every frequency channel?
+
+- Writing dataframe to disk every nth frequency iteration
 """
 
 
@@ -91,20 +102,24 @@ def main():
         freq_chans = numpy.arange(cData.shape[0])
     if time_ints is None:
         time_ints = numpy.arange(cData.shape[1])
-    res_dict = {}
+
+    indices = ['freq', 'time_int']
+    # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
+    slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
+    df = pd.DataFrame(columns=indices+slct_keys)
     stdout = io.StringIO()
     with redirect_stdout(stdout): # suppress output
         initp = None
         for iter_dim in numpy.ndindex(cData[:, time_ints, :].shape[:2]):
             res_rel = doRelCal(cRedG, cData[iter_dim], distribution='cauchy', \
                                initp=initp)
+            res_rel = {key:res_rel[key] for key in slct_keys}
+            res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
+                            indices[1]:time_ints[iter_dim[1]]})
+            df = df.append(res_rel, ignore_index=True)
             initp = res_rel['x'] # use solution for next solve in iteration
-            res_dict[freq_chans[iter_dim[0]], iter_dim[1]] = res_rel
 
-    df = pd.DataFrame.from_dict(res_dict, orient='index')
-    df[['freq', 'time_int']] = pd.DataFrame(df.index.tolist(), index=df.index)
-    df.reset_index(drop=True, inplace=True)
-    df.set_index(['freq', 'time_int'], inplace=True)
+    df.set_index(indices, inplace=True)
     df.to_pickle(out_df)
     print('Relative calibration results saved to dataframe')
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
