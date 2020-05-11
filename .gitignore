@@ -2,4 +2,5 @@
 __pycache__/
 test_nb.ipynb
 res_df*.pkl
+res_df*.csv
 run_rel_cal.sh.*
