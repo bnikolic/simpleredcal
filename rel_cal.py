@@ -42,12 +42,12 @@ def mod_str_arg(str_arg):
     :rtype: int, ndarray, None
     """
     if str_arg is not None:
-        chans = list(map(int, str_arg.split('~')))
-        if len(chans) > 1:
-            chans = numpy.arange(chans[0], chans[1]+1)
+        out = list(map(int, str_arg.split('~')))
+        if len(out) > 1:
+            out = numpy.arange(out[0], out[1]+1)
     else:
-        chans = None
-    return chans
+        out = None
+    return out
 
 
 def new_fn(out, jd_time, datetime):
@@ -133,20 +133,33 @@ def main():
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
     header = header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
+
+    iter_dims = list(numpy.ndindex(cData[:, time_ints, :].shape[:2]))
+    if csv_exists:
+        # skipping freqs and tints that are already in csv file
+        df = pd.read_csv(out_csv, usecols=indices)
+        cmap_f = dict(map(reversed, enumerate(freq_chans)))
+        cmap_t = dict(map(reversed, enumerate(time_ints)))
+        done = [(cmap_f[f], cmap_t[t]) for (f, t) in df.values if (f in freq_chans \
+        and t in time_ints)]
+        iter_dims = iter([idim for idim in iter_dims if idim not in done])
+        if not any(iter_dims):
+            print('Solutions to all specified frequency channels and time \
+                   integrations already exist in {}'.format(out_csv))
+
     stdout = io.StringIO()
     with redirect_stdout(stdout): # suppress output
-        with open(out_csv, 'a') as f:
+        with open(out_csv, 'a') as f: # write / append to csv file
             writer = DictWriter(f, fieldnames=header)
             if not csv_exists:
                 writer.writeheader()
             initp = None
-            for iter_dim in numpy.ndindex(cData[:, time_ints, :].shape[:2]):
+            for iter_dim in iter_dims:
                 res_rel = doRelCal(RedG, cData[iter_dim], distribution='cauchy', \
                                    initp=initp)
                 res_rel = {key:res_rel[key] for key in slct_keys}
                 initp = res_rel['x'] # use solution for next solve in iteration
-                # expanding out the solution
-                for i, param in enumerate(res_rel['x']):
+                for i, param in enumerate(res_rel['x']): # expanding out the solution
                     res_rel[i] = param
                 del res_rel['x']
                 res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
@@ -160,6 +173,8 @@ def main():
     if os.path.exists(out_df):
         if not args.overwrite_df:
             out_df = new_fn(out_df, args.jd_time, startTime)
+    df.drop_duplicates(inplace=True) # shouldn't need this step if freq and tint
+    # skipping works correctly
     df.to_pickle(out_df)
     print('Relative calibration results dataframe pickled to {}'.format(out_df))
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
