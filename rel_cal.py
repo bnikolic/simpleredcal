@@ -118,6 +118,7 @@ def main():
     time_ints = mod_str_arg(args.tints)
 
     hdraw, RedG, cData = group_data(filename, pol, freq_chans, bad_ants)
+    cData = cData.data # ignore masks for the time being
 
     if freq_chans is None:
         freq_chans = numpy.arange(cData.shape[0])

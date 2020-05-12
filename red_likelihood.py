@@ -8,7 +8,8 @@ from matplotlib import pyplot as plt
 from scipy import stats as stats
 from scipy.optimize import Bounds, minimize
 
-from hera_cal.io import HERAData
+import hera_cal
+from hera_cal.io import HERACal, HERAData
 from hera_cal.redcal import get_reds
 
 from jax.config import config
@@ -16,7 +17,7 @@ config.update('jax_enable_x64', True)
 import jax
 from jax import jit, jacrev
 
-# NB. Where 'numpy' is used below it has to be real numpy. 'np' can be
+# n.b. where 'numpy' is used below it has to be real numpy. 'np' can be
 # either jax or real numpy
 np=jax.np
 
@@ -82,8 +83,10 @@ def relabelAnts(redg):
     return redg
 
 
-def group_data(zen_path, pol, chans, bad_ants):
-    """Returns redundant baseline grouping and reformatted dataset
+def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
+               flag_path=None):
+    """Returns redundant baseline grouping and reformatted dataset, with
+    external flags applied, if specified
 
     :param zen_path: Path of uvh5 dataset
     :type zen_path: str
@@ -91,35 +94,75 @@ def group_data(zen_path, pol, chans, bad_ants):
     :type pol: str
     :param chans: Frequency channel(s) {0, 1023} (None to choose all)
     :type chans: array-like, int, or None
-    :param bad_ants: Known bad antennas to flag
-    :type bad_ants: array-like
+    :param tints: Time integrations {0, 59} (None to choose all)
+    :type tints: array-like, int, or None
+    :param bad_ants: Known bad antennas to flag, optional
+    :type bad_ants: array-like, None
+    :param flag_path: Path of calfits flag file, optional
+    :type flag_path: str, None
 
     :return hd: HERAData class
     :rtype hd: HERAData class
     :return redg: Grouped baselines, as returned by groupBls
     :rtype redg: ndarray
-    :return cdata: Grouped visibilities with format consistent with redg and
-    dimensions (freq chans, time integrations, baselines) - the 0th dimension
-    only has 1 element if only 1 frequency channel is specified
-    :rtype cdata: ndarray
+    :return cdata: Grouped visibilities with flags in numpy MaskedArray format,
+    with format consistent with redg and dimensions (freq chans,
+    time integrations, baselines)
+    :rtype cdata: MaskedArray
     """
+    # format for indexing
+    if isinstance(chans, int):
+        chans = np.asarray([chans])
+    if isinstance(tints, int):
+        tints = np.asarray([tints])
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
-    if isinstance(chans, int):
-        chans = [chans]
-    data, flags, nsamples = hd.read(freq_chans=chans)
-    flt_bls = fltBad(reds, bad_ants)
-    redg = groupBls(flt_bls) # Baseline grouping
-    no_tints, no_chans = data[list(data.keys())[0]].shape
+    data, flags, _ = hd.read(freq_chans=chans, polarizations=[pol])
+    # filter bls by bad antennas
+    if bad_ants is not None:
+        reds = fltBad(reds, bad_ants)
+        data = {k: v for k, v in data.items() if not any(i in bad_ants \
+                for i in k[:2])}
+    redg = groupBls(reds) # baseline grouping
+
+    data = {k: v for k, v in data.items() if k[0] != k[1]} # flt autos
+    flags = {k: flags[k] for k in data.keys()} # apply same flt to flags
+
+    no_tints, no_chans = data[list(data.keys())[0]].shape # get data dimensions
     if chans is None:
-        chans = numpy.arange(no_chans)
+        chans = np.arange(no_chans) # indices, not channel numbers
+    if tints is not None:
+        # filtering time integrations
+        data = {k: v[tints, :] for k, v in data.items()}
+        flags = {k: v[tints, :] for k, v in flags.items()}
+    else:
+        tints = np.arange(no_tints)
+
+    if flag_path is not None:
+        hc = HERACal(flag_path)
+        _, cal_flags, _, _ = hc.read()
+        # filtering flags data
+        cal_flags = {k: v[np.ix_(tints, chans)] for k, v in cal_flags.items()}
+        ap1, ap2 = hera_cal.utils.split_pol(pol)
+        # updating flags from flag file
+        for (i, j, pol) in data.keys():
+            flags[(i, j, pol)] += cal_flags[(i, ap1)]
+            flags[(i, j, pol)] += cal_flags[(j, ap2)]
+        # dict of masked data with updated flags
+        data = {k: numpy.ma.array(v, mask=flags[k], fill_value=np.nan) for k, v \
+                in data.items()}
+        data_size = np.asarray(list(data.values())).flatten().size
+        no_flags = np.asarray([d.mask for d in data.values()]).flatten().sum()
+        print('{} out of {} data points flagged for dataset {}'.format(no_flags, \
+              data_size, zen_path))
 
     # Collect data together
-    cdata = numpy.empty((len(chans), no_tints, redg.shape[0]), \
-                        dtype=complex)
-    for idx in range(len(chans)):
-        cdata[idx, ...] = numpy.hstack([data[(*bl_row[1:], pol)][:, idx, \
-                                        numpy.newaxis] for bl_row in redg])
+    no_tints, no_chans = data[list(data.keys())[0]].shape # get filtered data dimensions
+    cdata = numpy.ma.empty((no_chans, no_tints, redg.shape[0]), fill_value=np.nan, \
+                           dtype=complex)
+    for chan in range(len(chans)):
+        cdata[chan, ...] = numpy.ma.hstack([data[(*bl_row[1:], pol)][:, chan, \
+                                           np.newaxis] for bl_row in redg])
     return hd, redg, cdata
 
 
@@ -485,11 +528,11 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None):
     :rtype: Scipy optimization result object
     """
     if initp is None:
-        #Setup initial parameters
+        # setup initial parameters
         ants = numpy.unique(redg[:, 1:])
         no_unq_bls = numpy.unique(redg[:, 0]).size
-        xvis = numpy.ones(no_unq_bls*2) # Complex vis
-        xgains = numpy.ones(ants.size*2) # Complex gains
+        xvis = numpy.ones(no_unq_bls*2) # complex vis
+        xgains = numpy.ones(ants.size*2) # complex gains
         initp = numpy.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
@@ -530,9 +573,9 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     """
     ants = numpy.unique(redg[:, 1:])
     if initp is None:
-        #Setup initial parameters
-        xgains = numpy.ones(ants.size*2) # Complex gains
-        xdegparams = np.asarray([1, 0, 0, 0]) # Overall amplitude, overall phase,
+        # setup initial parameters
+        xgains = numpy.ones(ants.size*2) # complex gains
+        xdegparams = np.asarray([1, 0, 0, 0]) # overall amplitude, overall phase,
         # and phase gradients in x and y
         initp= numpy.hstack([xgains, *xdegparams])
 
@@ -541,7 +584,7 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     lb[-4] = 0 # lower bound for overall amplitude
     bounds = Bounds(lb, ub)
 
-    # Constraints for optimization
+    # constraints for optimization
     constraints = Opt_Constraints(ants, ref_ant, ant_pos, redg)
     cons = [{'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},
@@ -586,7 +629,7 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     :rtype: Scipy optimization result object
     """
     if initp is None:
-        #Setup initial parameters: overall amplitude, overall phase, and x and y
+        # setup initial parameters: overall amplitude, overall phase, and x and y
         # phase gradients
         initp = np.asarray([1, 0, 0, 0])
 
