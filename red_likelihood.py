@@ -241,13 +241,15 @@ def decomposeCArray(arr):
 
 
 def makeCArray(arr):
-    """Reformat 1D real array into 1D complex array
+    """Reformat 1D real array of interweaved Re and Im components into 1D
+    complex array
 
-    The 1D real array with elements [Re(z_1), Im(z_1), ..., Re(z_i), Im(z_i)]
-    is reformatted such that the new array has elements [z_1, ..., z_i].
+    The 1D real array with elements [Re(z_1), Im(z_1), ..., Re(z_n), Im(z_n)]
+    is reformatted such that the new array has elements [z_1, ..., z_n], with
+    z_i = Re(z_i) + j*Im(z_i).
 
-    :param arr: Real array where the complex elements of arr have been decomposed
-    into adjacent real elements
+    :param arr: Real array where the complex elements of a complex array have
+    been decomposed into adjacent real elements
     :type arr: ndarray
 
     :return: Complex array
@@ -257,6 +259,27 @@ def makeCArray(arr):
     assert arr.dtype  == numpy.float
     arr = arr.reshape((-1, 2))
     return arr[:, 0] + 1j*arr[:, 1]
+
+
+def makeEArray(arr):
+    """Reformat 1D real array of interweaved amplitude and phase components into
+    1D complex array
+
+    The 1D real array with elements [Amp(z_1), Arg(z_1), ..., Amp(z_n), Arg(z_n)]
+    is reformatted such that the new array has elements [z_1, ..., z_n], with
+    z_i = Amp(z_i)*exp(j*Arg(z_i)).
+
+    :param arr: Real array where the amplitude and phase components of a complex
+    array have been decomposed into adjacent real elements
+    :type arr: ndarray
+
+    :return: Complex array
+    :rtype: ndarray
+    """
+    assert arr.ndim == 1
+    assert arr.dtype  == numpy.float
+    arr = arr.reshape((-1, 2))
+    return arr[:, 0] * np.exp(1j*arr[:, 1])
 
 
 @jit
@@ -327,10 +350,11 @@ def relative_logLkl(credg, distribution, obsvis, params):
     reformatted to have format consistent with credg
     :type obsvis: ndarray
     :param params: Parameters to constrain: redundant visibilities and gains
+    (Re & Im components interweaved for both)
     :type params: ndarray
 
     :return: Negative log-likelihood of MLE computation
-    :rtype: ndarray (1 element)
+    :rtype: float
     """
     NRedVis = credg[:, 0].max().item() + 1
     vis_comps, gains_comps = np.split(params, [NRedVis*2, ])
@@ -362,16 +386,17 @@ def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, params):
     :param rel_vis: Visibility solutions for redundant baseline groups after
     relative calibration
     :param rel_vis: ndarray
-    :param params: Parameters to constrain: normalized gains, overall amplitude,
-    overall phase and phase gradients in x and y
+    :param params: Parameters to constrain: normalized gains (amp and phase
+    components interweaved), overall amplitude, overall phase and phase
+    gradients in x and y
     :type params: ndarray
 
     :return: Negative log-likelihood of MLE computation
-    :rtype: ndarray (1 element)
+    :rtype: float
      """
     NAnts = credg[:, 1:].max().item() + 1
     rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
-    rel_gains = makeCArray(rel_gains_comps)
+    rel_gains = makeEArray(rel_gains_comps)
 
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
     delta = obsvis - gVis(w_alpha, credg, rel_gains)
@@ -415,25 +440,25 @@ class Opt_Constraints:
         :rtype: ndarray
         """
         rel_gains_comps = params[:self.ants.size*2]
-        return makeCArray(rel_gains_comps)
+        return makeEArray(rel_gains_comps)
 
     def avg_amp(self, params):
-        """Constraint that average of gain amplitudes must be equal to 1
+        """Constraint that mean of gain amplitudes must be equal to 1
 
-        :return: Residual between average gain amplitudes and 1
+        :return: Residual between mean gain amplitudes and 1
         :rtype: float
         """
-        rel_gains = self.get_rel_gains(params)
-        return np.average(np.abs(rel_gains)) - 1
+        amps = params[:self.ants.size*2:2]
+        return np.mean(amps) - 1
 
     def avg_phase(self, params):
-        """Constraint that circular mean of gain phases must be equal to 0
+        """Constraint that mean of gain phases must be equal to 0
 
         :return: Residual between circular mean of gain phases and 0
         :rtype: float
         """
-        rel_gains = self.get_rel_gains(params)
-        return stats.circmean(np.angle(rel_gains))
+        phases = params[1:self.ants.size*2:2]
+        return np.mean(phases)
 
     def ref_phase(self, params):
         """Set phase of reference antenna gain to 0 to set overall phase
@@ -441,8 +466,8 @@ class Opt_Constraints:
         :return: Residual between referance antenna phase and 0
         :rtype: float
         """
-        rel_gains = self.get_rel_gains(params)
-        return np.angle(rel_gains[self.ref_ant_idx])
+        phases = params[1:self.ants.size*2:2]
+        return phases[self.ref_ant_idx]
 
     def ref_amp(self, params):
         """Set amplitude of reference antenna gain to 1 to set overall amplitude
@@ -450,8 +475,8 @@ class Opt_Constraints:
         :return: Residual between referance antenna amplitude and 1
         :rtype: float
         """
-        rel_gains = self.get_rel_gains(params)
-        return np.absolute(rel_gains[self.ref_ant_idx]) - 1
+        amps = params[:self.ants.size*2:2]
+        return amps[self.ref_ant_idx] - 1
 
     def phase_grad_x(self, params):
         """Constraint that phase gradient in x is 0
@@ -459,11 +484,8 @@ class Opt_Constraints:
         :return: Residual between phase gradient in x and 0
         :rtype: float
         """
-        rel_gains = self.get_rel_gains(params)
-        phases = np.angle(rel_gains)
-        # wrapping phases between -pi and pi - is this required?
-        wrapped_phases = (phases + np.pi) % (2*np.pi) - np.pi
-        return np.sum(wrapped_phases*self.x_pos)
+        phases = params[1:self.ants.size*2:2]
+        return np.sum(phases*self.x_pos)
 
     def phase_grad_y(self, params):
         """Constraint that phase gradient in y is 0
@@ -471,10 +493,8 @@ class Opt_Constraints:
         :return: Residual between phase gradient in y and 0
         :rtype: float
         """
-        rel_gains = self.get_rel_gains(params)
-        phases = np.angle(rel_gains)
-        wrapped_phases = (phases + np.pi) % (2*np.pi) - np.pi
-        return np.sum(wrapped_phases*self.y_pos)
+        phases = params[1:self.ants.size*2:2]
+        return np.sum(phases*self.y_pos)
 
 
 def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
@@ -499,7 +519,7 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     :type params: ndarray
 
     :return: Negative log-likelihood of MLE computation
-    :rtype: ndarray (1 element)
+    :rtype: float
     """
     w_alpha = degVis(ant_sep, rel_vis1, *params[[0, 2, 3]])
     delta = rel_vis2 - w_alpha
@@ -532,7 +552,7 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None):
         ants = numpy.unique(redg[:, 1:])
         no_unq_bls = numpy.unique(redg[:, 0]).size
         xvis = numpy.ones(no_unq_bls*2) # complex vis
-        xgains = numpy.ones(ants.size*2) # complex gains
+        xgains = numpy.ones(ants.size*2) # complex gains (Re & Im components)
         initp = numpy.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
@@ -574,13 +594,16 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     ants = numpy.unique(redg[:, 1:])
     if initp is None:
         # setup initial parameters
-        xgains = numpy.ones(ants.size*2) # complex gains
-        xdegparams = np.asarray([1, 0, 0, 0]) # overall amplitude, overall phase,
+        xgamps = np.ones(ants.size) # gain amplitudes
+        xgphases = np.zeros(ants.size) # gain phases
+        xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
+        xdegparams = np.zeros(4) # overall amplitude, overall phase,
         # and phase gradients in x and y
-        initp= numpy.hstack([xgains, *xdegparams])
+        initp= np.hstack([xgains, *xdegparams])
 
-    lb = numpy.repeat(-numpy.inf, initp.size)
-    ub = numpy.repeat(numpy.inf, initp.size)
+    lb = numpy.repeat(-np.inf, initp.size)
+    ub = numpy.repeat(np.inf, initp.size)
+    lb[:ants.size:2] = 0 # lower bound for gain amplitudes
     lb[-4] = 0 # lower bound for overall amplitude
     bounds = Bounds(lb, ub)
 
@@ -589,7 +612,7 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     cons = [{'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},
             {'type': 'eq', 'fun': constraints.ref_phase},
-            {'type': 'eq', 'fun': constraints.ref_amp},
+            # {'type': 'eq', 'fun': constraints.ref_amp}, # not needed (?)
             {'type': 'eq', 'fun': constraints.phase_grad_x},
             {'type': 'eq', 'fun': constraints.phase_grad_y}
             ]
