@@ -117,7 +117,8 @@ def main():
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
-    hdraw, RedG, cData = group_data(filename, pol, freq_chans, bad_ants)
+    hdraw, RedG, cData = group_data(filename, pol, freq_chans, time_ints, \
+                                    bad_ants, flag_path=None)
     cData = cData.data # ignore masks for the time being
 
     if freq_chans is None:
@@ -135,7 +136,7 @@ def main():
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
     header = header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
-    iter_dims = list(numpy.ndindex(cData[:, time_ints, :].shape[:2]))
+    iter_dims = list(numpy.ndindex(cData.shape[:2]))
     if csv_exists:
         # skipping freqs and tints that are already in csv file
         df = pd.read_csv(out_csv, usecols=indices)
