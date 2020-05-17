@@ -15,7 +15,7 @@ from hera_cal.redcal import get_reds
 from jax.config import config
 config.update('jax_enable_x64', True)
 import jax
-from jax import jit, jacrev
+from jax import jit, jacrev, jacfwd
 
 # n.b. where 'numpy' is used below it has to be real numpy. 'np' can be
 # either jax or real numpy
@@ -432,16 +432,6 @@ class Opt_Constraints:
         self.x_pos = np.asarray([self.ant_pos[ant_no][0] for ant_no in self.cmap.keys()])
         self.y_pos = np.asarray([self.ant_pos[ant_no][1] for ant_no in self.cmap.keys()])
 
-    def get_rel_gains(self, params):
-        """Returns the complex relative gain parameters from the flattened array
-        of parameters
-
-        :return: Relative gain parameters in complex array format
-        :rtype: ndarray
-        """
-        rel_gains_comps = params[:self.ants.size*2]
-        return makeEArray(rel_gains_comps)
-
     def avg_amp(self, params):
         """Constraint that mean of gain amplitudes must be equal to 1
 
@@ -603,7 +593,7 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
 
     lb = numpy.repeat(-np.inf, initp.size)
     ub = numpy.repeat(np.inf, initp.size)
-    lb[:ants.size:2] = 0 # lower bound for gain amplitudes
+    lb[:ants.size*2:2] = 0 # lower bound for gain amplitudes
     lb[-4] = 0 # lower bound for overall amplitude
     bounds = Bounds(lb, ub)
 
@@ -620,8 +610,8 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(optimal_logLkl, relabelAnts(redg), distribution, \
                                ant_sep, obsvis, rel_vis))
-    res = minimize(ff, initp, constraints=cons, jac=jacrev(ff), \
-                   method='trust-constr', bounds=bounds)
+    res = minimize(ff, initp, constraints=cons, jac=jacrev(ff),
+                   hess=jacfwd(jacrev(ff)), method='trust-constr', bounds=bounds)
     print(res['message'])
     return res
 
