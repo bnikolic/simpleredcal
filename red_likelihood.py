@@ -5,7 +5,6 @@ import functools
 
 import numpy
 from matplotlib import pyplot as plt
-from scipy import stats as stats
 from scipy.optimize import Bounds, minimize
 
 import hera_cal
