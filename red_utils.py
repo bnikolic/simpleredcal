@@ -15,7 +15,7 @@ from red_likelihood import makeCArray
 
 
 def find_zen_file(JD_time):
-    """Returns path of selected JD_time
+    """Returns visibility dataset path for the specified JD_time
 
     :param JD_time: Fractional Julian date
     :type JD_time: str
@@ -37,6 +37,35 @@ def find_zen_file(JD_time):
     if not os.path.exists(zen_path):
         raise ValueError('Dataset {} not found'.format(zen_file))
     return zen_path
+
+
+def find_flag_file(JD_time, cal_type):
+    """Returns flag dataset path for the specified JD_time
+
+    :param JD_time: Fractional Julian date
+    :type JD_time: str
+    :param cal_type: Calibration process that produced the flag file {"first",
+    "omni", "abs", "flagged_abs", "smooth_abs"}, to name a few
+    :type cal_type: str
+
+    :return: File path of visibility dataset
+    :rtype: str, None
+    """
+    mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/robust_cal'
+    nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2'
+    flg_file = 'zen.{}.HH.{}.calfits'.format(JD_time, cal_type)
+    jd_day = flg_file.split('.')[1]
+    if os.path.exists(mdm_dir):
+        flg_path = os.path.join(mdm_dir, flg_file)
+    elif os.path.exists(nrao_dir):
+        flg_path = os.path.join(nrao_dir, jd_day, flg_file)
+    else:
+        flg_path = './{}'.format(flg_file)
+
+    if not os.path.exists(flg_path):
+        print('Flag file {} not found\n'.format(flg_file))
+        flg_path = None
+    return flg_path
 
 
 def fn_format(fn, format):

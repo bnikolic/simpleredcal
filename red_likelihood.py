@@ -152,7 +152,7 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
                 in data.items()}
         data_size = np.asarray(list(data.values())).flatten().size
         no_flags = np.asarray([d.mask for d in data.values()]).flatten().sum()
-        print('{} out of {} data points flagged for dataset {}'.format(no_flags, \
+        print('{} out of {} data points flagged for dataset {}\n'.format(no_flags, \
               data_size, zen_path))
 
     # Collect data together
