@@ -2,17 +2,13 @@
 and time
 
 example run:
-$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1 \
---overwrite_df
+$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1
 
 Can then read the dataframe with:
-> pd.read_pickle('res_df.pkl')
+> pd.read_pickle('res_df.2458098.43869.ee.pkl')
 
-Note that default is to write all solutions to the same csv file.
-
-TODO:
-    - Additional labels for JD time and polarizations (when we move to
-    processing many observations at the same time)
+Note that default is to write all solutions to the same csv file, for each
+visibility dataset
 """
 
 
@@ -20,6 +16,7 @@ import argparse
 import datetime
 import io
 import os
+import re
 import textwrap
 from contextlib import redirect_stdout
 from csv import DictWriter
@@ -50,7 +47,7 @@ def mod_str_arg(str_arg):
     return out
 
 
-def new_fn(out, jd_time, datetime):
+def new_fn(out, jd_time, dt):
     """Write a new file labelled by the JD time under consideration and the
     current datetime
 
@@ -58,17 +55,21 @@ def new_fn(out, jd_time, datetime):
     :type out: str
     :param jd_time: Fractional JD time of dataset
     :type jd_time: float
-    :param datetime: Datetime to use in filename
-    :type datetime: datetime
+    :param dt: Datetime to use in filename
+    :type dt: datetime
 
     :return: New unique filename with JD time and current datetime
     :rtype:
     """
     bn = os.path.splitext(out)[0]
     ext = os.path.splitext(out)[-1]
-    dt = datetime.strftime('%Y_%m_%d.%H_%M_%S')
+    dt = dt.strftime('%Y_%m_%d.%H_%M_%S')
+    if jd_time is None:
+        jd_time = ''
+    if dt is None:
+        dt = datetime.datetime.now()
     out = '{}.{}.{}.{}'.format(bn, jd_time, dt, ext)
-    return out
+    return re.sub(r'\.+', '.', out)
 
 
 def main():
@@ -87,7 +88,7 @@ def main():
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
                         calibrate', metavar='JD')
-    parser.add_argument('--out', required=False, default='res_df', \
+    parser.add_argument('--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('--pol', required=True, metavar='pol', type=str, \
                         help='Polarization {"ee", "en", "nn", "ne"}')
@@ -97,19 +98,22 @@ def main():
     parser.add_argument('--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to calibrate \
                         {0, 59}')
-    parser.add_argument('--diff_csv', required=False, action='store_true', \
-                        help='Write data to a different csv file')
-    parser.add_argument('--overwrite_df', required=False, action='store_true', \
-                        help='Overwrite pickled dataframe')
+    parser.add_argument('--new_csv', required=False, action='store_true', \
+                        help='Write data to a new csv file')
     args = parser.parse_args()
 
     startTime = datetime.datetime.now()
 
-    out_csv = fn_format(args.out, 'csv')
+    out_fn = args.out
+    if out_fn is None:
+        out_fn = 'res_df.{}.{}'.format(args.jd_time, args.pol)
+
+    out_csv = fn_format(out_fn, 'csv')
     csv_exists = os.path.exists(out_csv)
     if csv_exists:
-        if args.diff_csv:
-            out_csv = new_fn(out_csv, args.jd_time, startTime)
+        if args.new_csv:
+            out_csv = new_fn(out_csv, None, startTime)
+            csv_exists = False
 
     filename = find_zen_file(args.jd_time)
     bad_ants = get_bad_ants(filename)
@@ -144,7 +148,7 @@ def main():
         cmap_t = dict(map(reversed, enumerate(time_ints)))
         done = [(cmap_f[f], cmap_t[t]) for (f, t) in df.values if (f in freq_chans \
         and t in time_ints)]
-        iter_dims = iter([idim for idim in iter_dims if idim not in done])
+        iter_dims = [idim for idim in iter_dims if idim not in done]
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time \
                    integrations already exist in {}'.format(out_csv))
@@ -171,12 +175,8 @@ def main():
     print('Relative calibration results saved to csv file {}'.format(out_csv))
     df = pd.read_csv(out_csv)
     df.set_index(indices, inplace=True)
-    out_df = out_csv.split('.')[0] + '.pkl'
-    if os.path.exists(out_df):
-        if not args.overwrite_df:
-            out_df = new_fn(out_df, args.jd_time, startTime)
-    df.drop_duplicates(inplace=True) # shouldn't need this step if freq and tint
-    # skipping works correctly
+    df.sort_values(by=indices, inplace=True)
+    out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
     df.to_pickle(out_df)
     print('Relative calibration results dataframe pickled to {}'.format(out_df))
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
