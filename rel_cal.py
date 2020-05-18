@@ -2,7 +2,7 @@
 and time
 
 example run:
-$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1
+$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1 --flag_type first
 
 Can then read the dataframe with:
 > pd.read_pickle('res_df.2458098.43869.ee.pkl')
@@ -25,7 +25,7 @@ import pandas as pd
 import numpy
 
 from red_likelihood import doRelCal, group_data
-from red_utils import find_zen_file, fn_format, get_bad_ants
+from red_utils import find_flag_file, find_zen_file, fn_format, get_bad_ants
 
 
 def mod_str_arg(str_arg):
@@ -88,17 +88,20 @@ def main():
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
                         calibrate', metavar='JD')
-    parser.add_argument('--out', required=False, default=None, \
+    parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
-    parser.add_argument('--pol', required=True, metavar='pol', type=str, \
+    parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
                         help='Polarization {"ee", "en", "nn", "ne"}')
-    parser.add_argument('--chans', required=False, default=None, metavar='C', \
+    parser.add_argument('-c', '--chans', required=False, default=None, metavar='C', \
                         type=str, help='Frequency channels to calibrate \
                         {0, 1023}')
-    parser.add_argument('--tints', required=False, default=None, metavar='T', \
+    parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to calibrate \
                         {0, 59}')
-    parser.add_argument('--new_csv', required=False, action='store_true', \
+    parser.add_argument('-f', '--flag_type', required=False, default=None, \
+                        metavar='F', type=str, help='Flag type e.g. "first", \
+                        "omni", "abs"')
+    parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
 
@@ -115,15 +118,27 @@ def main():
             out_csv = new_fn(out_csv, None, startTime)
             csv_exists = False
 
-    filename = find_zen_file(args.jd_time)
-    bad_ants = get_bad_ants(filename)
+    zen_fn = find_zen_file(args.jd_time)
+    bad_ants = get_bad_ants(zen_fn)
+
+    flag_type = args.flag_type
+    if flag_type is not None:
+        flag_fn = find_flag_file(args.jd_time, flag_type)
+    else:
+        flag_fn = None
+
     pol = args.pol
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
-    hdraw, RedG, cData = group_data(filename, pol, freq_chans, time_ints, \
-                                    bad_ants, flag_path=None)
-    cData = cData.data # ignore masks for the time being
+    print('Running relative redundant calibration on visibility dataset {} for \
+          polarization {}, frequency channel(s) {} and time integration(s) {}\n'.\
+          format(os.path.basename(zen_fn), args.pol, args.chans, args.tints))
+
+    hdraw, RedG, cData = group_data(zen_fn, pol, freq_chans, time_ints, \
+                                    bad_ants, flag_path=flag_fn)
+    flags = cData.mask
+    cData = cData.data
 
     if freq_chans is None:
         freq_chans = numpy.arange(cData.shape[0])
@@ -151,7 +166,14 @@ def main():
         iter_dims = [idim for idim in iter_dims if idim not in done]
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time \
-                   integrations already exist in {}'.format(out_csv))
+                  integrations already exist in {}\n'.format(out_csv))
+
+    # remove flagged channels from iter_dims
+    if True in flags:
+        flg_chans = numpy.where(flags.all(axis=(1,2)))[0] # indices
+        print('Flagged channels for visibility dataset {} are: {}\n'.\
+             format(os.path.basename(zen_fn), freq_chans[flg_chans]))
+        iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
     stdout = io.StringIO()
     with redirect_stdout(stdout): # suppress output
@@ -172,13 +194,13 @@ def main():
                                 indices[1]:time_ints[iter_dim[1]]})
                 writer.writerow(res_rel) # writing to csv
 
-    print('Relative calibration results saved to csv file {}'.format(out_csv))
+    print('Relative calibration results saved to csv file {}\n'.format(out_csv))
     df = pd.read_csv(out_csv)
     df.set_index(indices, inplace=True)
     df.sort_values(by=indices, inplace=True)
     out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
     df.to_pickle(out_df)
-    print('Relative calibration results dataframe pickled to {}'.format(out_df))
+    print('Relative calibration results dataframe pickled to {}\n'.format(out_df))
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
 
 
