@@ -16,6 +16,7 @@ import argparse
 import datetime
 import io
 import os
+import pickle
 import re
 import textwrap
 from contextlib import redirect_stdout
@@ -186,21 +187,33 @@ def main():
                 res_rel = doRelCal(RedG, cData[iter_dim], distribution='cauchy', \
                                    initp=initp)
                 res_rel = {key:res_rel[key] for key in slct_keys}
-                initp = res_rel['x'] # use solution for next solve in iteration
-                for i, param in enumerate(res_rel['x']): # expanding out the solution
+                # expanding out the solution
+                for i, param in enumerate(res_rel['x']):
                     res_rel[i] = param
+                # use solution for next solve in iteration
+                if res_rel['success']:
+                    initp = res_rel['x']
                 del res_rel['x']
                 res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
                                 indices[1]:time_ints[iter_dim[1]]})
                 writer.writerow(res_rel) # writing to csv
 
-    print('Relative calibration results saved to csv file {}\n'.format(out_csv))
+    print('Relative calibration results saved to csv file {}'.format(out_csv))
     df = pd.read_csv(out_csv)
     df.set_index(indices, inplace=True)
     df.sort_values(by=indices, inplace=True)
     out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
     df.to_pickle(out_df)
-    print('Relative calibration results dataframe pickled to {}\n'.format(out_df))
+    print('Relative calibration results dataframe pickled to {}'.format(out_df))
+
+    # creating metadata file
+    out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
+    if not os.path.exists(out_md):
+        md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG}
+        with open(out_df.rsplit('.', 1)[0] + '.md.pkl', 'wb') as f:
+            pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print('Relative calibration metadata pickled to {}\n'.format(out_md))
+
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
 
 
