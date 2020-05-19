@@ -156,16 +156,18 @@ def lst_to_jd_time(lst, JD_day, telescope='HERA'):
 
 
 def split_rel_results(resx, no_unq_bls):
-    """Split results from relative calibration minimization into visibility
-    and gains arrays
+    """Split the real results array from relative calibration minimization into
+    complex visibility and gains arrays
 
-    :param res: Optimization result for the solved antenna gains and true sky
+    :param resx: Optimization result for the solved antenna gains and true sky
     visibilities
-    :type res: ndarray
+    :type resx: ndarray
     :param no_unq_bls: Number of unique baselines (equivalently the number of
     redundant visibilities)
     :type no_unq_bls: int
 
+    :return: Tuple of complex visibility and gain solution arrays
+    :rtype: tuple
     """
     vis_params, gains_params = numpy.split(resx, [no_unq_bls*2,])
     res_vis = makeCArray(vis_params)

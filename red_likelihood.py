@@ -282,6 +282,27 @@ def makeEArray(arr):
     return arr[:, 0] * np.exp(1j*arr[:, 1])
 
 
+def norm_rel_sols(resx, no_unq_bls):
+    """Renormalize relative calibration solutions such that the average gain
+    amplitude is 1
+
+    :param resx: Optimization result for the solved antenna gains and true sky
+    visibilities
+    :type resx: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+
+    :return: Renormalized visibility and gains solutions array
+    :rtype:
+    """
+    vis_params, gain_params = np.split(resx, [no_unq_bls*2,])
+    avg_amp = np.average(np.abs(makeCArray(gain_params)))
+    vis_params = vis_params * avg_amp**2
+    gain_params = gain_params / avg_amp
+    return np.hstack([vis_params, gain_params])
+
+
 @jit
 def gVis(vis, credg, gains):
     """Apply gains to visibilities
@@ -327,7 +348,7 @@ def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     """
     x_sep = ant_sep[:, 0]
     y_sep = ant_sep[:, 1]
-    w_alpha = np.square(amp) * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
+    w_alpha = amp**2 * np.exp(1j * (phase_grad_x * x_sep + phase_grad_y \
                * y_sep)) * rel_vis
     return w_alpha
 
