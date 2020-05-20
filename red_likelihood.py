@@ -19,7 +19,7 @@ from jax import jit, jacrev, jacfwd
 
 # n.b. where 'numpy' is used below it has to be real numpy. 'np' can be
 # either jax or real numpy
-np=jax.np
+np=jax.numpy
 
 
 def fltBad(bll, badl, minbl=2):
