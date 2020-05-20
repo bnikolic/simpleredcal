@@ -399,7 +399,7 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None):
     return res
 
 
-def relative_logLklRP(credg, distribution, obsvis, params):
+def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates*
@@ -425,17 +425,29 @@ def relative_logLklRP(credg, distribution, obsvis, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: float
     """
+    no_ants = credg[:, 1:].max().item() + 1
     no_unq_bls = credg[:, 0].max().item() + 1
-    vis_comps, gains_comps = np.split(params, [no_unq_bls*2, ])
+    vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
+
+    # Constraint that average amplitude is 1
+    # Cannot assign directly to gain_comps because get
+    # TypeError: JAX 'Tracer' objects do not support item assignment
+    gamps = gain_comps[::2]
+    gphases = gain_comps[1::2]
+    gamp1, gampref, gamp2 = np.split(gamps, [ref_ant_idx, ref_ant_idx+1])
+    gampref = no_ants-gamp1.sum()-gamp2.sum() # constraint is here
+    gamps = np.hstack([gamp1, gampref, gamp2])
+    gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+
     vis = makeEArray(vis_comps)
-    gains = makeEArray(gains_comps)
+    gains = makeEArray(gain_comps)
 
     delta = obsvis - gVis(vis, credg, gains)
     log_likelihood = LLFN[distribution](delta)
     return log_likelihood
 
 
-def doRelCalRP(redg, obsvis, distribution='cauchy', initp=None):
+def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
     """Do relative step of redundant calibration
 
     *Polar coordinates*
@@ -458,16 +470,16 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', initp=None):
     :rtype: Scipy optimization result object
     """
     no_unq_bls = numpy.unique(redg[:, 0]).size
+    ants = numpy.unique(redg[:, 1:])
     if initp is None:
         # setup initial parameters
-        ants = numpy.unique(redg[:, 1:])
         xvamps = np.ones(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
         xgamps = np.ones(ants.size) # gain amplitudes
         xgphases = np.zeros(ants.size) # gain phases
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
-        initp = numpy.hstack([xvis, xgains])
+        initp = np.hstack([xvis, xgains])
 
     lb = numpy.repeat(-np.inf, initp.size)
     ub = numpy.repeat(np.inf, initp.size)
@@ -475,8 +487,10 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', initp=None):
     bounds = Bounds(lb, ub)
 
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
-                               distribution, obsvis))
-    res = minimize(ff, initp, jac=jacrev(ff), bounds=None, method='SLSQP')
+             distribution, obsvis, condenseMap(ants)[ref_ant]))
+    # wff = lambda x: np.asarray(ff(x))
+    # wjacrev = lambda x: np.asarray(jacrev(ff)(x))
+    res = minimize(ff, initp, jac=jacrev(ff), bounds=None)
     print(res['message'])
     return res
 
