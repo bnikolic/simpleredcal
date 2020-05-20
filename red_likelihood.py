@@ -297,7 +297,7 @@ def norm_rel_sols(resx, no_unq_bls):
     :rtype:
     """
     vis_params, gain_params = np.split(resx, [no_unq_bls*2,])
-    avg_amp = np.average(np.abs(makeCArray(gain_params)))
+    avg_amp = np.mean(np.abs(makeCArray(gain_params)))
     vis_params = vis_params * avg_amp**2
     gain_params = gain_params / avg_amp
     return np.hstack([vis_params, gain_params])
@@ -429,14 +429,18 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
     no_unq_bls = credg[:, 0].max().item() + 1
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
 
-    # Constraint that average amplitude is 1
+    # Constraint that mean amplitude is 1
     # Cannot assign directly to gain_comps because get
     # TypeError: JAX 'Tracer' objects do not support item assignment
     gamps = gain_comps[::2]
     gphases = gain_comps[1::2]
-    gamp1, gampref, gamp2 = np.split(gamps, [ref_ant_idx, ref_ant_idx+1])
-    gampref = no_ants-gamp1.sum()-gamp2.sum() # constraint is here
+    gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
+    gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
+    # set referance gain constraints
+    gampref = no_ants - gamps.sum() # so that the mean amp is 1
+    gphaseref = -gphases.sum() # so that the mean phase is 0
     gamps = np.hstack([gamp1, gampref, gamp2])
+    gphases = np.hstack([gphase1, gphaseref, gphase2])
     gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
 
     vis = makeEArray(vis_comps)
@@ -473,10 +477,11 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
     ants = numpy.unique(redg[:, 1:])
     if initp is None:
         # setup initial parameters
+        # referance antenna gain not included in the initial parameters
         xvamps = np.ones(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
-        xgamps = np.ones(ants.size) # gain amplitudes
-        xgphases = np.zeros(ants.size) # gain phases
+        xgamps = np.ones(ants.size-1) # gain amplitudes
+        xgphases = np.zeros(ants.size-1) # gain phases
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
@@ -486,12 +491,30 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
     lb[no_unq_bls*2::2] = 0 # lower bound for gain amplitudes
     bounds = Bounds(lb, ub)
 
+    ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
-             distribution, obsvis, condenseMap(ants)[ref_ant]))
+             distribution, obsvis, ref_ant_idx))
     # wff = lambda x: np.asarray(ff(x))
     # wjacrev = lambda x: np.asarray(jacrev(ff)(x))
-    res = minimize(ff, initp, jac=jacrev(ff), bounds=None)
+    res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
+                   bounds=bounds, method='TNC')
     print(res['message'])
+
+    vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
+    gamps = gain_comps[::2]
+    gphases = gain_comps[1::2]
+    gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
+    gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
+    gampref = ants.size - gamps.sum()
+    gphaseref = - gphases.sum()
+    gamps = np.hstack([gamp1, gampref, gamp2])
+    print('Gain amplitude mean: {}'.format(np.mean(gamps)))
+    gphases = np.hstack([gphase1, gphaseref, gphase2])
+    print('Gain phase mean: {}'.format(np.mean(gphases)))
+    gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+    res['x'] = np.hstack([vis_comps, gain_comps])
+    print(gamps)
+
     return res
 
 
