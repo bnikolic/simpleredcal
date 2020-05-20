@@ -132,9 +132,15 @@ def main():
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
-    print('Running relative redundant calibration on visibility dataset {} for \
-          polarization {}, frequency channel(s) {} and time integration(s) {}\n'.\
-          format(os.path.basename(zen_fn), args.pol, args.chans, args.tints))
+    pchans = args.chans
+    if pchans is None:
+        pchans = '0~1023'
+    ptints = args.tints
+    if ptints is None:
+        ptints = '0~59'
+    print('Running relative redundant calibration on visibility dataset {} for '\
+          'polarization {}, frequency channel(s) {} and time integration(s) {}\n'.\
+          format(os.path.basename(zen_fn), args.pol, pchans, ptints))
 
     hdraw, RedG, cData = group_data(zen_fn, pol, freq_chans, time_ints, \
                                     bad_ants, flag_path=flag_fn)
@@ -166,8 +172,8 @@ def main():
         and t in time_ints)]
         iter_dims = [idim for idim in iter_dims if idim not in done]
         if not any(iter_dims):
-            print('Solutions to all specified frequency channels and time \
-                  integrations already exist in {}\n'.format(out_csv))
+            print('Solutions to all specified frequency channels and time '\
+                  'integrations already exist in {}\n'.format(out_csv))
 
     # remove flagged channels from iter_dims
     if True in flags:

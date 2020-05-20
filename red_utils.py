@@ -11,7 +11,7 @@ from scipy.optimize import minimize_scalar
 import pyuvdata
 from pyuvdata import utils as uvutils
 
-from red_likelihood import makeCArray
+from red_likelihood import makeCArray, makeEArray
 
 
 def find_zen_file(JD_time):
@@ -155,7 +155,7 @@ def lst_to_jd_time(lst, JD_day, telescope='HERA'):
     return res['x']
 
 
-def split_rel_results(resx, no_unq_bls):
+def split_rel_results(resx, no_unq_bls, coords='cartesian'):
     """Split the real results array from relative calibration minimization into
     complex visibility and gains arrays
 
@@ -169,9 +169,10 @@ def split_rel_results(resx, no_unq_bls):
     :return: Tuple of complex visibility and gain solution arrays
     :rtype: tuple
     """
+    cfun = {'cartesian':makeCArray, 'polar':makeEArray}
     vis_params, gains_params = numpy.split(resx, [no_unq_bls*2,])
-    res_vis = makeCArray(vis_params)
-    res_gains = makeCArray(gains_params)
+    res_vis = cfun[coords](vis_params)
+    res_gains = cfun[coords](gains_params)
     return res_vis, res_gains
 
 
