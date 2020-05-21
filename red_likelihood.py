@@ -496,8 +496,9 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
              distribution, obsvis, ref_ant_idx))
     # wff = lambda x: np.asarray(ff(x))
     # wjacrev = lambda x: np.asarray(jacrev(ff)(x))
-    res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
-                   bounds=bounds, method='TNC')
+    res = minimize(ff, initp, jac=jacrev(ff), \
+                   hess=jacfwd(jacrev(ff)), bounds=bounds, method='TNC', \
+                   )
     print(res['message'])
 
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])

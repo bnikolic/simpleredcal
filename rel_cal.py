@@ -217,7 +217,7 @@ def main():
     out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
     if not os.path.exists(out_md):
         md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG}
-        with open(out_df.rsplit('.', 1)[0] + '.md.pkl', 'wb') as f:
+        with open(out_md, 'wb') as f:
             pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
     print('Relative calibration metadata pickled to {}\n'.format(out_md))
 
