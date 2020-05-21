@@ -437,7 +437,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
     # set referance gain constraints
-    gampref = no_ants - gamps.sum() # so that the mean amp is 1
+    # gampref = no_ants - gamps.sum() # so that the mean amp is 1
+    gampref = 1/gamps.prod() # so that the product of amps is 1
     gphaseref = -gphases.sum() # so that the mean phase is 0
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, gphaseref, gphase2])
@@ -486,18 +487,18 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
 
-    lb = numpy.repeat(-np.inf, initp.size)
-    ub = numpy.repeat(np.inf, initp.size)
-    lb[no_unq_bls*2::2] = 0 # lower bound for gain amplitudes
-    bounds = Bounds(lb, ub)
+    # lb = numpy.repeat(-np.inf, initp.size)
+    # ub = numpy.repeat(np.inf, initp.size)
+    # lb[no_unq_bls*2::2] = 0 # lower bound for gain amplitudes
+    # bounds = Bounds(lb, ub)
 
     ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
              distribution, obsvis, ref_ant_idx))
     # wff = lambda x: np.asarray(ff(x))
     # wjacrev = lambda x: np.asarray(jacrev(ff)(x))
-    res = minimize(ff, initp, jac=jacrev(ff), \
-                   hess=jacfwd(jacrev(ff)), bounds=bounds, method='TNC', \
+    res = minimize(ff, initp, jac=jacrev(ff), method='BFGS', \
+                   # hess=jacfwd(jacrev(ff)), bounds=bounds, method='SLSQP', \
                    )
     print(res['message'])
 
@@ -506,8 +507,8 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
     gphases = gain_comps[1::2]
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
-    gampref = ants.size - gamps.sum()
-    gphaseref = - gphases.sum()
+    gampref = 1/gamps.prod()
+    gphaseref = -gphases.sum()
     gamps = np.hstack([gamp1, gampref, gamp2])
     print('Gain amplitude mean: {}'.format(np.mean(gamps)))
     gphases = np.hstack([gphase1, gphaseref, gphase2])
