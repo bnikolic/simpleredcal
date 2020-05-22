@@ -52,7 +52,7 @@ def find_flag_file(JD_time, cal_type):
     :rtype: str, None
     """
     mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/robust_cal'
-    nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2'
+    nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2/IDR2_2'
     flg_file = 'zen.{}.HH.{}.calfits'.format(JD_time, cal_type)
     jd_day = flg_file.split('.')[1]
     if os.path.exists(mdm_dir):
