@@ -362,7 +362,7 @@ def relative_logLkl(credg, distribution, obsvis, params):
     return log_likelihood
 
 
-def doRelCal(redg, obsvis, distribution='cauchy', initp=None):
+def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
     """Do relative step of redundant calibration
 
     *Cartesian coordinates*
@@ -394,7 +394,7 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None):
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
                                distribution, obsvis))
-    res = minimize(ff, initp, jac=jacrev(ff))
+    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
     print(res['message'])
     return res
 
