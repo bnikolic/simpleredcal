@@ -452,7 +452,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
     return log_likelihood
 
 
-def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
+def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None, \
+               max_nit=1000):
     """Do relative step of redundant calibration
 
     *Polar coordinates*
@@ -469,6 +470,8 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
     :type distribution: str
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
+    :param max_nit: Maximum number of iterations to perform
+    :type max_nit: int
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -487,19 +490,11 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None):
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
 
-    # lb = numpy.repeat(-np.inf, initp.size)
-    # ub = numpy.repeat(np.inf, initp.size)
-    # lb[no_unq_bls*2::2] = 0 # lower bound for gain amplitudes
-    # bounds = Bounds(lb, ub)
-
     ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
              distribution, obsvis, ref_ant_idx))
-    # wff = lambda x: np.asarray(ff(x))
-    # wjacrev = lambda x: np.asarray(jacrev(ff)(x))
     res = minimize(ff, initp, jac=jacrev(ff), method='BFGS', \
-                   # hess=jacfwd(jacrev(ff)), bounds=bounds, method='SLSQP', \
-                   )
+                   options={'maxiter':max_nit})
     print(res['message'])
 
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
