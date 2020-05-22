@@ -1,6 +1,5 @@
 .ipynb_checkpoints
 __pycache__/
 test*
-res_df*.pkl
-res_df*.csv
+res_df*
 run_rel_cal.sh.*
