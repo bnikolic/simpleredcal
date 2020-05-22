@@ -3,3 +3,4 @@ __pycache__/
 test*
 res_df*
 run_rel_cal.sh.*
+rel_cal.*.out
