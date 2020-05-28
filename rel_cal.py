@@ -118,6 +118,7 @@ def main():
     header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
     iter_dims = list(numpy.ndindex(cData.shape[:2]))
+    skip_cal = False
     if csv_exists:
         # skipping freqs and tints that are already in csv file
         df = pd.read_csv(out_csv, usecols=indices)
@@ -130,8 +131,6 @@ def main():
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_csv))
             skip_cal = True
-        else:
-            skip_cal = False
 
     if not skip_cal:
         # remove flagged channels from iter_dims

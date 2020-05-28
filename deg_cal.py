@@ -49,7 +49,7 @@ def main():
                         help='Polarization {"ee", "en", "nn", "ne"}')
     parser.add_argument('-d', '--deg_dim', required=True, metavar='D', type=str, \
                         help='Which dimension to compare relatively calibrated \
-                        visibility solutions {"last", "freq", "jd"}')
+                        visibility solutions {"tint", "freq", "jd"}')
     parser.add_argument('-c', '--chans', required=False, default=None, metavar='C', \
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
@@ -83,9 +83,11 @@ def main():
     ptints = args.tints
     if ptints is None:
         ptints = '0~59'
-    print('Running degenerate fitting on visibility dataset {} for frequency '\
-          'channel(s) {} and time integration(s) {}\n'.\
-          format(os.path.basename(find_zen_file(args.jd_time)), pchans, ptints))
+    pdict = {'freq':'frequency channels', 'tint':'time integrations'}
+    print('Running degenerate fitting on adjacent {} for visibility dataset {} '\
+          'for frequency channel(s) {} and time integration(s) {}\n'.\
+          format(os.path.basename(find_zen_file(args.jd_time)), \
+          pdict[args.deg_dim], pchans, ptints))
 
     rel_df_path = find_rel_df(args.jd_time, args.pol)
     rel_df = pd.read_pickle(rel_df_path)
@@ -106,18 +108,30 @@ def main():
     no_unq_bls = md['no_unq_bls']
     redg = md['redg']
 
-    indices = ['freq1', 'freq2', 'time_int']
+    if args.deg_dim == 'freq':
+        indices = ['freq1', 'freq2', 'time_int']
+        # getting adjacent frequency channel pairs
+        iter_dims = [idim for idim in zip(freq_chans, freq_chans[1:]) if \
+                     idim[1] - idim[0] == 1]
+        iter_dims = [idim+(time_int,) for idim in iter_dims for time_int in \
+                     time_ints] # adding time integrations
+        a, b, c, d = 0, 1, 2, 2 # for iteration indexing
+
+    if args.deg_dim == 'tint':
+        indices = ['time_int1', 'time_int2', 'freq']
+        # getting adjacent LAST (time integration) pairs
+        iter_dims = [idim for idim in zip(time_ints, time_ints[1:]) if \
+                     idim[1] - idim[0] == 1]
+        iter_dims = [idim+(freq_chan,) for idim in iter_dims for freq_chan in \
+                     freq_chans] # adding frequency channels
+        a, b, c, d = 2, 2, 0, 1 # for iteration indexing
+
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
     no_deg_params = 4
     header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
 
-    # what to iterate over (pairs of datasets)
-    # try for just channel comparison herewith (extend after)
-    iter_dims = [idim for idim in zip(freq_chans, freq_chans[1:])] # freq pairs
-    iter_dims = [idim+(time_int,) for idim in iter_dims for time_int in \
-                 time_ints] # time integrations
-
+    skip_cal = False
     if csv_exists:
         # skipping freqs and tints that are already in csv file
         df = pd.read_csv(out_csv, usecols=indices)
@@ -126,8 +140,6 @@ def main():
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_csv))
             skip_cal = True
-        else:
-            skip_cal = False
 
     if not skip_cal:
         stdout = io.StringIO()
@@ -139,9 +151,9 @@ def main():
                 initp = None
                 for iter_dim in iter_dims:
                     # get relatively calibrated solutions
-                    resx1 = rel_df.loc[iter_dim[0], iter_dim[2]][len(slct_keys)-1:]\
+                    resx1 = rel_df.loc[iter_dim[a], iter_dim[c]][len(slct_keys)-1:]\
                     .values.astype(float)
-                    resx2 = rel_df.loc[iter_dim[1], iter_dim[2]][len(slct_keys)-1:]\
+                    resx2 = rel_df.loc[iter_dim[b], iter_dim[d]][len(slct_keys)-1:]\
                     .values.astype(float)
                     rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
