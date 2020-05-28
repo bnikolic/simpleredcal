@@ -84,7 +84,6 @@ def main():
     else:
         flag_fn = None
 
-    pol = args.pol
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
@@ -98,7 +97,7 @@ def main():
           'polarization {}, frequency channel(s) {} and time integration(s) {}\n'.\
           format(os.path.basename(zen_fn), args.pol, pchans, ptints))
 
-    hdraw, RedG, cData = group_data(zen_fn, pol, freq_chans, time_ints, \
+    hdraw, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
                                     bad_ants, flag_path=flag_fn)
     flags = cData.mask
     cData = cData.data
@@ -116,7 +115,7 @@ def main():
     indices = ['freq', 'time_int']
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
-    header = header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
+    header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
     iter_dims = list(numpy.ndindex(cData.shape[:2]))
     if csv_exists:
@@ -130,52 +129,57 @@ def main():
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_csv))
+            skip_cal = True
+        else:
+            skip_cal = False
 
-    # remove flagged channels from iter_dims
-    if True in flags:
-        flg_chans = numpy.where(flags.all(axis=(1,2)))[0] # indices
-        print('Flagged channels for visibility dataset {} are: {}\n'.\
-             format(os.path.basename(zen_fn), freq_chans[flg_chans]))
-        iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
+    if not skip_cal:
+        # remove flagged channels from iter_dims
+        if True in flags:
+            flg_chans = numpy.where(flags.all(axis=(1,2)))[0] # indices
+            print('Flagged channels for visibility dataset {} are: {}\n'.\
+                 format(os.path.basename(zen_fn), freq_chans[flg_chans]))
+            iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
-    stdout = io.StringIO()
-    with redirect_stdout(stdout): # suppress output
-        with open(out_csv, 'a') as f: # write / append to csv file
-            writer = DictWriter(f, fieldnames=header)
-            if not csv_exists:
-                writer.writeheader()
-            initp = None
-            for iter_dim in iter_dims:
-                res_rel = doRelCal(RedG, cData[iter_dim], distribution='cauchy', \
-                                   initp=initp)
-                res_rel = {key:res_rel[key] for key in slct_keys}
-                res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
-                # expanding out the solution
-                for i, param in enumerate(res_rel['x']):
-                    res_rel[i] = param
-                # use solution for next solve in iteration
-                if res_rel['success']:
-                    initp = res_rel['x']
-                del res_rel['x']
-                res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
-                                indices[1]:time_ints[iter_dim[1]]})
-                writer.writerow(res_rel) # writing to csv
+        stdout = io.StringIO()
+        with redirect_stdout(stdout): # suppress output
+            with open(out_csv, 'a') as f: # write / append to csv file
+                writer = DictWriter(f, fieldnames=header)
+                if not csv_exists:
+                    writer.writeheader()
+                initp = None
+                for iter_dim in iter_dims:
+                    res_rel = doRelCal(RedG, cData[iter_dim], distribution='cauchy', \
+                                       initp=initp)
+                    res_rel = {key:res_rel[key] for key in slct_keys}
+                    res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
+                    # expanding out the solution
+                    for i, param in enumerate(res_rel['x']):
+                        res_rel[i] = param
+                    # use solution for next solve in iteration
+                    if res_rel['success']:
+                        initp = res_rel['x']
+                    del res_rel['x']
+                    res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
+                                    indices[1]:time_ints[iter_dim[1]]})
+                    writer.writerow(res_rel) # writing to csv
 
-    print('Relative calibration results saved to csv file {}'.format(out_csv))
-    df = pd.read_csv(out_csv)
-    df.set_index(indices, inplace=True)
-    df.sort_values(by=indices, inplace=True)
-    out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
-    df.to_pickle(out_df)
-    print('Relative calibration results dataframe pickled to {}'.format(out_df))
+        print('Relative calibration results saved to csv file {}'.format(out_csv))
+        df = pd.read_csv(out_csv)
+        df.set_index(indices, inplace=True)
+        df.sort_values(by=indices, inplace=True)
+        out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
+        df.to_pickle(out_df)
+        print('Relative calibration results dataframe pickled to {}'.format(out_df))
 
-    # creating metadata file
-    out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
-    if not os.path.exists(out_md):
-        md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG}
-        with open(out_md, 'wb') as f:
-            pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
-    print('Relative calibration metadata pickled to {}\n'.format(out_md))
+        # creating metadata file
+        out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
+        if not os.path.exists(out_md):
+            md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
+                  'antpos':hdraw.antpos}
+            with open(out_md, 'wb') as f:
+                pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print('Relative calibration metadata pickled to {}\n'.format(out_md))
 
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
 

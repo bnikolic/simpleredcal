@@ -19,7 +19,7 @@ def find_zen_file(JD_time):
     """Returns visibility dataset path for the specified JD_time
 
     :param JD_time: Fractional Julian date
-    :type JD_time: str
+    :type JD_time: float
 
     :return: File path of visibility dataset
     :rtype: str
@@ -44,7 +44,7 @@ def find_flag_file(JD_time, cal_type):
     """Returns flag dataset path for the specified JD_time
 
     :param JD_time: Fractional Julian date
-    :type JD_time: str
+    :type JD_time: float
     :param cal_type: Calibration process that produced the flag file {"first",
     "omni", "abs", "flagged_abs", "smooth_abs"}, to name a few
     :type cal_type: str
@@ -67,6 +67,22 @@ def find_flag_file(JD_time, cal_type):
         print('Flag file {} not found\n'.format(flg_file))
         flg_path = None
     return flg_path
+
+
+def find_rel_df(JD_time, pol):
+    """Returns relative calibration results dataframe path for the specified
+    JD_time
+
+    :param JD_time: Fractional Julian date
+    :type JD_time: str
+
+    :return: File path of relative calibration results dataframe
+    :rtype: str
+    """
+    df_path = './rel_df.{}.{}.pkl'.format(JD_time, pol)
+    if not os.path.exists(df_path):
+        raise ValueError('DataFrame {} not found'.format(df_path))
+    return df_path
 
 
 def fn_format(fn, format):
