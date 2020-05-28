@@ -1,8 +1,10 @@
 """Utility functions for robust redundant calibration"""
 
 
+import datetime
 import os
 import pickle
+import re
 
 import numpy
 from matplotlib import pyplot as plt
@@ -202,6 +204,51 @@ def abs_residuals(residuals):
     """
     return [numpy.median(numpy.absolute(getattr(residuals, i))) \
             for i in ('real', 'imag')]
+
+
+def mod_str_arg(str_arg):
+    """Returns int, ndarray or None, which is readable by group_data
+
+    :param str_arg: Number or range to select in format: '50', or '50~60'. None
+    to select all.
+    :type str_arg: str, None
+
+    :return: int, ndarray or None
+    :rtype: int, ndarray, None
+    """
+    if str_arg is not None:
+        out = list(map(int, str_arg.split('~')))
+        if len(out) > 1:
+            out = numpy.arange(out[0], out[1]+1)
+    else:
+        out = None
+    return out
+
+
+def new_fn(out, jd_time, dt):
+    """Write a new file labelled by the JD time under consideration and the
+    current datetime
+
+    :param out: Existing outfile to not overwrite
+    :type out: str
+    :param jd_time: Fractional JD time of dataset
+    :type jd_time: float
+    :param dt: Datetime to use in filename
+    :type dt: datetime
+
+    :return: New unique filename with JD time and current datetime
+    :rtype:
+    """
+    bn = os.path.splitext(out)[0]
+    ext = os.path.splitext(out)[-1]
+    dt = dt.strftime('%Y_%m_%d.%H_%M_%S')
+    if jd_time is None:
+        jd_time = ''
+    if dt is None:
+        dt = datetime.datetime.now()
+    out = '{}.{}.{}.{}'.format(bn, jd_time, dt, ext)
+    return re.sub(r'\.+', '.', out)
+
 
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     """Pot visibility amplitudes or phases, grouped by redundant type
