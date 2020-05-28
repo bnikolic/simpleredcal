@@ -7,7 +7,6 @@ import pickle
 import re
 
 import numpy
-from matplotlib import pyplot as plt
 from scipy.optimize import minimize_scalar
 
 import pyuvdata
@@ -248,63 +247,3 @@ def new_fn(out, jd_time, dt):
         dt = datetime.datetime.now()
     out = '{}.{}.{}.{}'.format(bn, jd_time, dt, ext)
     return re.sub(r'\.+', '.', out)
-
-
-def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
-    """Pot visibility amplitudes or phases, grouped by redundant type
-
-    :param cdata: Grouped visibilities with format consistent with redg
-    :type cdata: ndarray
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
-    :param vis_type: Plot either visibility amplitude or phase {'amp', 'phase'}
-    :type vis_type: str
-    """
-    vis_calc = {'amp':numpy.abs, 'phase': numpy.angle}
-    bl_id_seperations = numpy.unique(redg[:, 0], return_index=True)[1][1:]
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.matshow(vis_calc[vis_type](cdata), aspect='auto')
-    for bl_id_seperation in bl_id_seperations:
-        plt.axvline(x=bl_id_seperation, color='white', linestyle='-.', linewidth=1)
-    ax.grid(False)
-    ax.set_xlabel('Baseline ID')
-    ax.set_ylabel('Time Integration')
-    plt.show()
-
-
-def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots',
-          **kwargs):
-    """Plot real and imaginary parts of complex array on same plot
-
-    :param carr: Complex 1D array
-    :type carr: ndarray
-    :param figsize: Figure size
-    :type figsize: tuple
-    :param split_ax: Split real and imag components onto separate axes?
-    :type split_ax: bool
-    :param save_plot: Save plot?
-    :type save_plot: bool
-    :param save_dir: Path of directory to save plots
-    :type save_dir: str
-    """
-    if not split_ax:
-        plt.figure(figsize=figsize)
-        plt.plot(carr.real, label='Real')
-        plt.plot(carr.imag, label='Imag')
-        for k, v in kwargs.items():
-            getattr(plt, k)(v)
-        plt.legend()
-    else:
-        fig, ax = plt.subplots(nrows=2, sharex=True, figsize=figsize)
-        ax[0].plot(carr.real)
-        ax[1].plot(carr.imag)
-        ax[0].set_ylabel('Real')
-        ax[1].set_ylabel('Imag')
-        plt.xlabel('Baseline')
-        if 'title' in kwargs.keys():
-            fig.suptitle(kwargs['title'])
-    if save_plot:
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
-        plt.savefig('{}/vis.png'.format(save_dir))
-    plt.show()
