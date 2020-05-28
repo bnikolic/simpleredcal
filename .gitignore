@@ -1,6 +1,9 @@
 .ipynb_checkpoints
 __pycache__/
 test*
-res_df*
 run_rel_cal.sh.*
-rel_cal.*.out
+*.out
+res_df*
+rel_df*
+deg_df*
+opt_df*

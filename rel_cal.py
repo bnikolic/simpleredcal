@@ -5,7 +5,7 @@ example run:
 $ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1 --flag_type first
 
 Can then read the dataframe with:
-> pd.read_pickle('res_df.2458098.43869.ee.pkl')
+> pd.read_pickle('rel_df.2458098.43869.ee.pkl')
 
 Note that default is to write all solutions to the same csv file, for each
 visibility dataset
@@ -79,7 +79,7 @@ def main():
     Relative redundant calibration of visibilities
 
     Takes a given HERA visibility dataset in uvh5 file format and performs
-    relative redundant calibration (up to the overall ampltitude, overall
+    relative redundant calibration (up to the overall amplitude, overall
     phase, and phase gradient degenerate parameters) for each frequency channel
     and each time integration in the dataset.
 
@@ -110,7 +110,7 @@ def main():
 
     out_fn = args.out
     if out_fn is None:
-        out_fn = 'res_df.{}.{}'.format(args.jd_time, args.pol)
+        out_fn = 'rel_df.{}.{}'.format(args.jd_time, args.pol)
 
     out_csv = fn_format(out_fn, 'csv')
     csv_exists = os.path.exists(out_csv)
