@@ -93,14 +93,18 @@ def main():
     rel_df = pd.read_pickle(rel_df_path)
 
     if freq_chans is None:
-        freq_chans = numpy.arange(cData.shape[0])
+        freq_chans = numpy.arange(1023)
     if time_ints is None:
-        time_ints = numpy.arange(cData.shape[1])
+        time_ints = numpy.arange(60)
 
     # filter by specified channels and time integrations
     freq_flt = numpy.in1d(rel_df.index.get_level_values('freq'), freq_chans)
     tint_flt = numpy.in1d(rel_df.index.get_level_values('time_int'), time_ints)
     rel_df = rel_df[freq_flt & tint_flt]
+
+    # only getting frequencies and time integrations that exist in the df
+    freq_chans = rel_df.index.get_level_values('freq').unique().values
+    time_ints = rel_df.index.get_level_values('time_int').unique().values
 
     with open(rel_df_path.rsplit('.', 1)[0] + '.md.pkl', 'rb') as f:
         md = pickle.load(f)
