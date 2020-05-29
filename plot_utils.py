@@ -125,7 +125,7 @@ def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
     plt.show()
 
     print('Max {} for minimizations with {}=False: {}\n'.format(ylab_dict[ycol], \
-          group_by, round(numpy.max(df['fun'][~df['success']].values), 3)))
+          group_by, round(numpy.max(df[ycol][~df['success']].values), 3)))
 
     print('Max {} for minimizations with {}=True: {}'.format(ylab_dict[ycol], \
-          group_by, round(numpy.max(df['fun'][df['success']].values), 3)))
+          group_by, round(numpy.max(df[ycol][df['success']].values), 3)))
