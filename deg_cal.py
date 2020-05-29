@@ -139,7 +139,8 @@ def main():
     if csv_exists:
         # skipping freqs and tints that are already in csv file
         df = pd.read_csv(out_csv, usecols=indices)
-        iter_dims = [idim for idim in iter_dims if idim not in df.values]
+        iter_dims = [idim for idim in iter_dims if not \
+            numpy.equal(df.values, numpy.asarray(idim)).all(1).any()]
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_csv))
