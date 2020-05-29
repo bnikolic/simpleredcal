@@ -164,6 +164,7 @@ def main():
                     writer.writerow(res_rel) # writing to csv
 
         print('Relative calibration results saved to csv file {}'.format(out_csv))
+
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         df.sort_values(by=indices, inplace=True)
@@ -175,7 +176,7 @@ def main():
         out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
-                  'antpos':hdraw.antpos}
+                  'antpos':hdraw.antpos, 'last':hdraw.lsts}
             with open(out_md, 'wb') as f:
                 pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
             print('Relative calibration metadata pickled to {}\n'.format(out_md))

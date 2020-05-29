@@ -14,6 +14,7 @@ visibility dataset
 
 import argparse
 import datetime
+import glob
 import io
 import os
 import pickle
@@ -25,8 +26,8 @@ import pandas as pd
 import numpy
 
 from red_likelihood import doDegVisVis, group_data
-from red_utils import find_flag_file, find_rel_df, find_zen_file, fn_format, \
-get_bad_ants, mod_str_arg, new_fn, split_rel_results
+from red_utils import find_flag_file, find_nearest, find_rel_df, find_zen_file, \
+fn_format, get_bad_ants, lst_to_jd_time, mod_str_arg, new_fn, split_rel_results
 
 
 def main():
@@ -109,6 +110,7 @@ def main():
     with open(rel_df_path.rsplit('.', 1)[0] + '.md.pkl', 'rb') as f:
         md = pickle.load(f)
     antpos = md['antpos']
+    last = md['last']
     no_unq_bls = md['no_unq_bls']
     redg = md['redg']
 
@@ -129,6 +131,16 @@ def main():
         iter_dims = [idim+(freq_chan,) for idim in iter_dims for freq_chan in \
                      freq_chans] # adding frequency channels
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
+
+    # if args.deg_dim == 'jd':
+        # find dataset from specified JD that contains visibilities at the same LAST
+        # indices = ['jd1', 'jd2', 'freq', 'time_int']
+        # jd_tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
+        # vis_files = glob.glob(os.path.join(data_dir, 'zen.*.uvh5'))
+        # vis_dict = {float('.'.join(os.path.basename(vis_file).split('.')[1:3]))\
+        #             :vis_file for vis_file in vis_files}
+        # jd_time2, file_idx = find_nearest(list(vis_dict.keys()), jd_tgt, \
+        #                                   condition='leq')
 
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']

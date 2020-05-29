@@ -118,19 +118,27 @@ def get_bad_ants(zen_path):
     return bad_ants_dict[jd_day]
 
 
-def find_nearest(arr, val):
+def find_nearest(arr, val, condition=None):
     """Find nearest value in array and its index
 
     :param array: Array-like
     :type array: array-like
     :param val: Find nearest value to this value
     :type val: float, int
+    :param condition: If nearest number must be less or greater than the target
+    {"leq", "geq"}
+    :type condition: str
 
     :return: Tuple of nearest value to val in array and its index
     :rtype: tuple
     """
     arr = numpy.asarray(arr)
-    idx = (numpy.abs(arr - val)).argmin()
+    if condition is None:
+        idx = (numpy.abs(arr - val)).argmin()
+    if condition == 'leq':
+        idx = numpy.where(numpy.less_equal(arr - val, 0))[0][-1]
+    if condition == 'geq':
+        idx = numpy.where(numpy.greater_equal(arr - val, 0))[0][0]
     return arr[idx], idx
 
 
@@ -169,7 +177,7 @@ def lst_to_jd_time(lst, JD_day, telescope='HERA'):
         return numpy.abs(uvutils.get_lst_for_time([JD_day+x], *lat_lon_alt)[0] - lst)
 
     res = minimize_scalar(func, bounds=(0, 1), method='bounded')
-    return res['x']
+    return JD_day + res['x']
 
 
 def split_rel_results(resx, no_unq_bls, coords='cartesian'):
