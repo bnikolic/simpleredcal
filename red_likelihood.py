@@ -309,7 +309,6 @@ def gVis(vis, credg, gains):
 
     :param vis: visibilities
     :type vis: ndarray
-
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
     :type credg: ndarray
@@ -379,6 +378,8 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
     :type distribution: str
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
+    :param max_nit: Maximum number of iterations to perform
+    :type max_nit: int
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -913,6 +914,8 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     :param rel_vis2: Visibility solutions for observation set 2 for redundant
     baseline groups after relative calibration
     :param rel_vis2: ndarray
+    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :type distribution: str
     :param initp: Initial parameter guesses for degenerate parameters
     :type initp: ndarray, None
 
