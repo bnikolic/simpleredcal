@@ -92,17 +92,17 @@ def main():
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
+    hd = HERAData(zen_fn)
+
     pchans = args.chans
     if pchans is None:
-        pchans = '0~1023'
+        pchans = '0~{}'.format(hd.Nfreqs-1)
     ptints = args.tints
     if ptints is None:
-        ptints = '0~59'
+        ptints = '0~{}'.format(hd.Ntimes-1)
     print('Running relative redundant calibration on visibility dataset {} for '\
           'polarization {}, frequency channel(s) {} and time integration(s) {}\n'.\
           format(os.path.basename(zen_fn), args.pol, pchans, ptints))
-
-    hd = HERAData(zen_fn)
 
     if freq_chans is None:
         freq_chans = numpy.arange(hd.Nfreqs)
