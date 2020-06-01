@@ -24,6 +24,8 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
+from hera_cal.io import HERAData
+
 from red_likelihood import doRelCal, group_data, norm_rel_sols
 from red_utils import find_flag_file, find_zen_file, fn_format, get_bad_ants, \
 mod_str_arg, new_fn
@@ -58,6 +60,9 @@ def main():
     parser.add_argument('-f', '--flag_type', required=False, default=None, \
                         metavar='F', type=str, help='Flag type e.g. "first", \
                         "omni", "abs"')
+    parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
+                        type=str, help='Fitting distribution for calibration \
+                        {"cauchy", "gaussian"}')
     parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
@@ -66,7 +71,7 @@ def main():
 
     out_fn = args.out
     if out_fn is None:
-        out_fn = 'rel_df.{}.{}'.format(args.jd_time, args.pol)
+        out_fn = 'rel_df.{}.{}.{}'.format(args.jd_time, args.pol, args.dist)
 
     out_csv = fn_format(out_fn, 'csv')
     csv_exists = os.path.exists(out_csv)
@@ -97,27 +102,16 @@ def main():
           'polarization {}, frequency channel(s) {} and time integration(s) {}\n'.\
           format(os.path.basename(zen_fn), args.pol, pchans, ptints))
 
-    hdraw, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
-                                    bad_ants, flag_path=flag_fn)
-    flags = cData.mask
-    cData = cData.data
+    hd = HERAData(zen_fn)
 
     if freq_chans is None:
-        freq_chans = numpy.arange(cData.shape[0])
+        freq_chans = numpy.arange(hd.Nfreqs)
     if time_ints is None:
-        time_ints = numpy.arange(cData.shape[1])
-
-    # to get fields for the csv header
-    no_ants = numpy.unique(RedG[:, 1:]).size
-    no_unq_bls = numpy.unique(RedG[:, 0]).size
-    psize = (no_ants + no_unq_bls)*2
+        time_ints = numpy.arange(hd.Ntimes)
 
     indices = ['freq', 'time_int']
-    # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
-    slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
-    header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
-    iter_dims = list(numpy.ndindex(cData.shape[:2]))
+    iter_dims = list(numpy.ndindex((freq_chans.size, time_ints.size)))
     skip_cal = False
     if csv_exists:
         # skipping freqs and tints that are already in csv file
@@ -133,6 +127,20 @@ def main():
             skip_cal = True
 
     if not skip_cal:
+        hd, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
+                                     bad_ants, flag_path=flag_fn)
+        flags = cData.mask
+        cData = cData.data
+
+        # to get fields for the csv header
+        no_ants = numpy.unique(RedG[:, 1:]).size
+        no_unq_bls = numpy.unique(RedG[:, 0]).size
+        psize = (no_ants + no_unq_bls)*2
+
+        # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
+        slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
+        header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
+
         # remove flagged channels from iter_dims
         if True in flags:
             flg_chans = numpy.where(flags.all(axis=(1,2)))[0] # indices
@@ -148,8 +156,8 @@ def main():
                     writer.writeheader()
                 initp = None
                 for iter_dim in iter_dims:
-                    res_rel = doRelCal(RedG, cData[iter_dim], distribution='cauchy', \
-                                       initp=initp)
+                    res_rel = doRelCal(RedG, cData[iter_dim], \
+                                       distribution=args.dist, initp=initp)
                     res_rel = {key:res_rel[key] for key in slct_keys}
                     res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
                     # expanding out the solution
@@ -176,7 +184,8 @@ def main():
         out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
-                  'antpos':hdraw.antpos, 'last':hdraw.lsts}
+                  'antpos':hdraw.antpos, 'last':hdraw.lsts, 'Nfreqs':hd.Nfreqs, \
+                  'Ntimes':hd.Ntimes}
             with open(out_md, 'wb') as f:
                 pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
             print('Relative calibration metadata pickled to {}\n'.format(out_md))

@@ -7,6 +7,7 @@ import pickle
 import re
 
 import numpy
+import pandas as pd
 from scipy.optimize import minimize_scalar
 
 import pyuvdata
@@ -69,17 +70,21 @@ def find_flag_file(JD_time, cal_type):
     return flg_path
 
 
-def find_rel_df(JD_time, pol):
+def find_rel_df(JD_time, pol, dist):
     """Returns relative calibration results dataframe path for the specified
     JD_time
 
     :param JD_time: Fractional Julian date
     :type JD_time: str
+    :param pol: Polarization of data
+    :type pol: str
+    :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
+    :type dist: str
 
     :return: File path of relative calibration results dataframe
     :rtype: str
     """
-    df_path = './rel_df.{}.{}.pkl'.format(JD_time, pol)
+    df_path = './rel_df.{}.{}.{}.pkl'.format(JD_time, pol, dist)
     if not os.path.exists(df_path):
         raise ValueError('DataFrame {} not found'.format(df_path))
     return df_path
@@ -143,7 +148,7 @@ def find_nearest(arr, val, condition=None):
 
 
 def jd_to_lst(JD_time, telescope='HERA'):
-    """Converts fractional JDs of HERAData object into LSTs
+    """Converts fractional JD of HERAData object into LAST
 
     :param JD: Julian time
     :type JD: float
@@ -178,6 +183,30 @@ def lst_to_jd_time(lst, JD_day, telescope='HERA'):
 
     res = minimize_scalar(func, bounds=(0, 1), method='bounded')
     return JD_day + res['x']
+
+
+def match_lst(JD_time, JD_day):
+    """Finds the JD time of the visibility dataset that constains data at a given
+    JD_day at the same LAST as the dataset at JD_time.
+
+    e.g. I have dataset at JD_time = 2458098.43869 and I want to find the dataset
+    on JD_day = 2458110 that has data for the same LAST as that for JD_time.
+    This function retuns the JD time of the dataset that satisfies this
+    (2458110.40141 for this example).
+
+    :param JD: Julian time of the dataset we want to match in LAST
+    :type JD: float
+    :param JD: Julian day of target dataset
+    :type JD: int
+
+    :return: Julian time of the target dataset
+    :rtype: float
+    """
+    df = pd.read_pickle('jd_lst_map_idr2.pkl') # df of JD and LAST information
+    lst = df.loc[df['JD_time'] == JD_time]['LASTs'].values[0][0] # take 1st LAST
+    tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
+    tgt_jd_time, _ = find_nearest(df['JD_time'].values, tgt, condition='leq')
+    return tgt_jd_time
 
 
 def split_rel_results(resx, no_unq_bls, coords='cartesian'):

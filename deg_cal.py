@@ -27,7 +27,8 @@ import numpy
 
 from red_likelihood import doDegVisVis, group_data
 from red_utils import find_flag_file, find_nearest, find_rel_df, find_zen_file, \
-fn_format, get_bad_ants, lst_to_jd_time, mod_str_arg, new_fn, split_rel_results
+fn_format, get_bad_ants, lst_to_jd_time, match_lst, mod_str_arg, new_fn, \
+split_rel_results
 
 
 def main():
@@ -55,9 +56,12 @@ def main():
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to fit {0, 59}')
-    parser.add_argument('-f', '--dist', required=False, default='cauchy', metavar='F', \
+    parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
+    parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
+                        type=float, help='JD day for fitting across JDs - only if \
+                        deg_dim = "jd"')
     parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
@@ -66,7 +70,8 @@ def main():
 
     out_fn = args.out
     if out_fn is None:
-        out_fn = 'deg_df.{}.{}.{}'.format(args.jd_time, args.pol, args.deg_dim)
+        out_fn = 'deg_df.{}.{}.{}.{}'.format(args.jd_time, args.pol, \
+                                             args.deg_dim, args.dist)
 
     out_csv = fn_format(out_fn, 'csv')
     csv_exists = os.path.exists(out_csv)
@@ -90,13 +95,19 @@ def main():
           format(os.path.basename(find_zen_file(args.jd_time)), \
           pdict[args.deg_dim], pchans, ptints))
 
-    rel_df_path = find_rel_df(args.jd_time, args.pol)
+    rel_df_path = find_rel_df(args.jd_time, args.pol, args.dist)
     rel_df = pd.read_pickle(rel_df_path)
 
+    with open(rel_df_path.rsplit('.', 2)[0] + '.md.pkl', 'rb') as f:
+        md = pickle.load(f)
+    antpos = md['antpos']
+    no_unq_bls = md['no_unq_bls']
+    redg = md['redg']
+
     if freq_chans is None:
-        freq_chans = numpy.arange(1023)
+        freq_chans = numpy.arange(md['Nfreqs'])
     if time_ints is None:
-        time_ints = numpy.arange(60)
+        time_ints = numpy.arange(md['Ntimes'])
 
     # filter by specified channels and time integrations
     freq_flt = numpy.in1d(rel_df.index.get_level_values('freq'), freq_chans)
@@ -106,13 +117,6 @@ def main():
     # only getting frequencies and time integrations that exist in the df
     freq_chans = rel_df.index.get_level_values('freq').unique().values
     time_ints = rel_df.index.get_level_values('time_int').unique().values
-
-    with open(rel_df_path.rsplit('.', 1)[0] + '.md.pkl', 'rb') as f:
-        md = pickle.load(f)
-    antpos = md['antpos']
-    last = md['last']
-    no_unq_bls = md['no_unq_bls']
-    redg = md['redg']
 
     if args.deg_dim == 'freq':
         indices = ['freq1', 'freq2', 'time_int']
@@ -132,15 +136,12 @@ def main():
                      freq_chans] # adding frequency channels
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
-    # if args.deg_dim == 'jd':
+    # TODO
+    if args.deg_dim == 'jd':
         # find dataset from specified JD that contains visibilities at the same LAST
-        # indices = ['jd1', 'jd2', 'freq', 'time_int']
-        # jd_tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
-        # vis_files = glob.glob(os.path.join(data_dir, 'zen.*.uvh5'))
-        # vis_dict = {float('.'.join(os.path.basename(vis_file).split('.')[1:3]))\
-        #             :vis_file for vis_file in vis_files}
-        # jd_time2, file_idx = find_nearest(list(vis_dict.keys()), jd_tgt, \
-        #                                   condition='leq')
+        indices = ['jd1', 'jd2', 'freq', 'time_int']
+        df2 = find_rel_df(match_lst(args.jd_time, args.tgt_jd), args.pol, \
+                          args.dist)
 
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
