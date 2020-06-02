@@ -18,6 +18,7 @@ import glob
 import io
 import os
 import pickle
+import sys
 import textwrap
 from contextlib import redirect_stdout
 from csv import DictWriter
@@ -146,8 +147,9 @@ def main():
             tgt_jd = int(float('2458098.43869')) + 1
         rel_df_path2 = find_rel_df(match_lst(args.jd_time, tgt_jd), args.pol, \
                                    args.dist)
+        print(rel_df_path2)
         rel_df2 = pd.read_pickle(rel_df_path2)
-        quit()
+        sys.exit('JD comparison stopped')
 
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
