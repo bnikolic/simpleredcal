@@ -513,9 +513,10 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None, \
                    options={'maxiter':max_nit})
     print(res['message'])
 
+    initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx)])
-    return res
+    return res, initp
 
 
 def relative_logLklCT(credg, distribution, obsvis, ref_ant_idx, params):

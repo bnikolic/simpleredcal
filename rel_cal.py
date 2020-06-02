@@ -156,16 +156,16 @@ def main():
                     writer.writeheader()
                 initp = None
                 for iter_dim in iter_dims:
-                    res_rel = doRelCalRP(RedG, cData[iter_dim], \
-                                         distribution=args.dist, initp=initp)
+                    res_rel, initp = doRelCalRP(RedG, cData[iter_dim], \
+                                                distribution=args.dist, initp=initp)
                     res_rel = {key:res_rel[key] for key in slct_keys}
                     # res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls) # not need for doRelCalRP
                     # expanding out the solution
                     for i, param in enumerate(res_rel['x']):
                         res_rel[i] = param
                     # use solution for next solve in iteration
-                    if res_rel['success']:
-                        initp = res_rel['x']
+                    if not res_rel['success']:
+                        initp = None
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
                                     indices[1]:time_ints[iter_dim[1]]})
@@ -184,7 +184,7 @@ def main():
         out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
-                  'antpos':hdraw.antpos, 'last':hdraw.lsts, 'Nfreqs':hd.Nfreqs, \
+                  'antpos':hd.antpos, 'last':hd.lsts, 'Nfreqs':hd.Nfreqs, \
                   'Ntimes':hd.Ntimes}
             with open(out_md, 'wb') as f:
                 pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
