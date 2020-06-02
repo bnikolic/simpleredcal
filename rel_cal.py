@@ -181,7 +181,7 @@ def main():
         print('Relative calibration results dataframe pickled to {}'.format(out_df))
 
         # creating metadata file
-        out_md = out_df.rsplit('.', 1)[0] + '.md.pkl'
+        out_md = out_df.rsplit('.', 2)[0] + '.md.pkl'
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
                   'antpos':hd.antpos, 'last':hd.lsts, 'Nfreqs':hd.Nfreqs, \

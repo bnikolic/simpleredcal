@@ -5,7 +5,7 @@ example run:
 $ python deg_cal.py 2458098.43869 --deg_dim freq --pol ee --chans 300~301 --tints 10~11
 
 Can then read the results dataframe with:
-> pd.read_pickle('deg_df.2458098.43869.ee.freq.pkl')
+> pd.read_pickle('deg_df.2458098.43869.ee.freq.cauchy.pkl')
 
 Note that default is to write all solutions to the same csv file, for each
 visibility dataset
@@ -14,11 +14,9 @@ visibility dataset
 
 import argparse
 import datetime
-import glob
 import io
 import os
 import pickle
-import sys
 import textwrap
 from contextlib import redirect_stdout
 from csv import DictWriter
@@ -26,10 +24,9 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
-from red_likelihood import doDegVisVis, group_data
-from red_utils import find_flag_file, find_nearest, find_rel_df, find_zen_file, \
-fn_format, get_bad_ants, lst_to_jd_time, match_lst, mod_str_arg, new_fn, \
-split_rel_results
+from red_likelihood import doDegVisVis
+from red_utils import find_nearest, find_rel_df, find_zen_file, fn_format, \
+lst_to_jd_time, match_lst, mod_str_arg, new_fn, split_rel_results
 
 
 def main():
@@ -69,10 +66,17 @@ def main():
 
     startTime = datetime.datetime.now()
 
+    pjd = ''
+    if args.deg_dim == 'jd':
+        tgt_jd = args.tgt_jd
+        if tgt_jd is None:
+            tgt_jd = int(args.jd_time) + 1 # choose consecutive JD
+        pjd = '.' + str(tgt_jd)
+
     out_fn = args.out
     if out_fn is None:
-        out_fn = 'deg_df.{}.{}.{}.{}'.format(args.jd_time, args.pol, \
-                                             args.deg_dim, args.dist)
+        out_fn = 'deg_df.{}.{}.{}{}.{}'.format(args.jd_time, args.pol, \
+                                               args.deg_dim, pjd, args.dist)
 
     out_csv = fn_format(out_fn, 'csv')
     csv_exists = os.path.exists(out_csv)
@@ -139,17 +143,38 @@ def main():
                      freq_chans] # adding frequency channels
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
+    rel_df_c = rel_df
     if args.deg_dim == 'jd':
-        indices = ['jd1', 'jd2', 'freq', 'time_int']
+        indices = ['time_int1', 'time_int2', 'freq']
         # find dataset from specified JD that contains visibilities at the same LAST
-        tgt_jd = args.tgt_jd
-        if tgt_jd is None:
-            tgt_jd = int(float('2458098.43869')) + 1
-        rel_df_path2 = find_rel_df(match_lst(args.jd_time, tgt_jd), args.pol, \
-                                   args.dist)
-        print(rel_df_path2)
+        jd_time2 = match_lst(args.jd_time, tgt_jd)
+        rel_df_path2 = find_rel_df(jd_time2, args.pol, args.dist)
+        # aligning datasets in LAST
+        last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+        last1 = last_df[last_df['JD_time'] == args.jd_time]['LASTs'].values[0]
+        last2 = last_df[last_df['JD_time'] == jd_time2]['LASTs'].values[0]
+        _, offset = find_nearest(last2, last1[0])
+
         rel_df2 = pd.read_pickle(rel_df_path2)
-        sys.exit('JD comparison stopped')
+        rel_df2 = rel_df2[rel_df2.index.get_level_values('time_int') >= offset]
+
+        next_row = numpy.where(last_df['JD_time'] == jd_time2)[0][0] + 1
+        rel_df_path3 = find_rel_df(last_df.iloc[next_row]['JD_time'], args.pol, \
+                                   args.dist)
+        rel_df3 = pd.read_pickle(rel_df_path3)
+        rel_df3 = rel_df3[rel_df3.index.get_level_values('time_int') < offset]
+
+        # combined results dataframes that is now alinged in LAST by row number
+        # with rel_df:
+        rel_df_c = pd.concat([rel_df2, rel_df3])
+        # pairing time_ints from rel_df and rel_df_c that match in LAST
+        time_ints2 = rel_df_c.index.get_level_values('time_int').unique().values
+        iter_dims = [idim for idim in zip(time_ints, time_ints2)]
+        iter_dims = [idim+(freq_chan,) for idim in iter_dims for freq_chan in \
+                     freq_chans]
+        iter_dims = sorted(iter_dims, key=lambda row: row[2]) # iterate across
+        # LAST first - should speed up fitting
+        a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
@@ -179,7 +204,7 @@ def main():
                     # get relatively calibrated solutions
                     resx1 = rel_df.loc[iter_dim[a], iter_dim[c]][len(slct_keys)-1:]\
                     .values.astype(float)
-                    resx2 = rel_df.loc[iter_dim[b], iter_dim[d]][len(slct_keys)-1:]\
+                    resx2 = rel_df_c.loc[iter_dim[b], iter_dim[d]][len(slct_keys)-1:]\
                     .values.astype(float)
                     rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
