@@ -44,7 +44,7 @@ def main():
     the degenerate fitting.
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
-                        analyze', metavar='JD')
+                        analyze', metavar='JD', type=float)
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
@@ -61,7 +61,7 @@ def main():
                         {"cauchy", "gaussian"}')
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
                         type=float, help='JD day for fitting across JDs - only if \
-                        deg_dim = "jd"')
+                        deg_dim = "jd". Default to pick consecutive JD day')
     parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
@@ -83,26 +83,28 @@ def main():
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
-    pchans = args.chans
-    if pchans is None:
-        pchans = '0~1023'
-    ptints = args.tints
-    if ptints is None:
-        ptints = '0~59'
-    pdict = {'freq':'frequency channels', 'tint':'time integrations'}
-    print('Running degenerate fitting on adjacent {} for visibility dataset {} '\
-          'for frequency channel(s) {} and time integration(s) {}\n'.\
-          format(os.path.basename(find_zen_file(args.jd_time)), \
-          pdict[args.deg_dim], pchans, ptints))
-
     rel_df_path = find_rel_df(args.jd_time, args.pol, args.dist)
     rel_df = pd.read_pickle(rel_df_path)
 
+    # retrieving visibility metadata
     with open(rel_df_path.rsplit('.', 2)[0] + '.md.pkl', 'rb') as f:
         md = pickle.load(f)
     antpos = md['antpos']
     no_unq_bls = md['no_unq_bls']
     redg = md['redg']
+
+    pchans = args.chans
+    if pchans is None:
+        pchans = '0~{}'.format(md['Nfreqs']-1)
+    ptints = args.tints
+    if ptints is None:
+        ptints = '0~{}'.format(md['Ntimes']-1)
+    pdict = {'freq':'frequency channels', 'tint':'time integrations', \
+             'jd':'Julian days'}
+    print('Running degenerate fitting on adjacent {} for visibility dataset {} '\
+          'for frequency channel(s) {} and time integration(s) {}\n'.\
+          format(os.path.basename(find_zen_file(args.jd_time)), \
+          pdict[args.deg_dim], pchans, ptints))
 
     if freq_chans is None:
         freq_chans = numpy.arange(md['Nfreqs'])
@@ -136,12 +138,16 @@ def main():
                      freq_chans] # adding frequency channels
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
-    # TODO
     if args.deg_dim == 'jd':
         # find dataset from specified JD that contains visibilities at the same LAST
         indices = ['jd1', 'jd2', 'freq', 'time_int']
-        df2 = find_rel_df(match_lst(args.jd_time, args.tgt_jd), args.pol, \
-                          args.dist)
+        tgt_jd = args.tgt_jd
+        if tgt_jd is None:
+            tgt_jd = int(float('2458098.43869')) + 1
+        rel_df_path2 = find_rel_df(match_lst(args.jd_time, tgt_jd), args.pol, \
+                                   args.dist)
+        rel_df2 = pd.read_pickle(rel_df_path2)
+        quit()
 
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']

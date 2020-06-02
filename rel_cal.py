@@ -46,7 +46,7 @@ def main():
     time integration.
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
-                        calibrate', metavar='JD')
+                        calibrate', metavar='JD', type=float)
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \

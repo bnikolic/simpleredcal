@@ -185,7 +185,7 @@ def lst_to_jd_time(lst, JD_day, telescope='HERA'):
     return JD_day + res['x']
 
 
-def match_lst(JD_time, JD_day):
+def match_lst(JD_time, JD_day, tint=0):
     """Finds the JD time of the visibility dataset that constains data at a given
     JD_day at the same LAST as the dataset at JD_time.
 
@@ -194,16 +194,18 @@ def match_lst(JD_time, JD_day):
     This function retuns the JD time of the dataset that satisfies this
     (2458110.40141 for this example).
 
-    :param JD: Julian time of the dataset we want to match in LAST
-    :type JD: float
-    :param JD: Julian day of target dataset
-    :type JD: int
+    :param JD_time: Julian time of the dataset we want to match in LAST
+    :type JD_time: float
+    :param JD_day: Julian day of target dataset
+    :type JD_day: int
+    :param tint: Time integration index to match
+    :type tint: int
 
     :return: Julian time of the target dataset
     :rtype: float
     """
     df = pd.read_pickle('jd_lst_map_idr2.pkl') # df of JD and LAST information
-    lst = df.loc[df['JD_time'] == JD_time]['LASTs'].values[0][0] # take 1st LAST
+    lst = df.loc[df['JD_time'] == JD_time]['LASTs'].values[0][tint] # take 1st LAST
     tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
     tgt_jd_time, _ = find_nearest(df['JD_time'].values, tgt, condition='leq')
     return tgt_jd_time
