@@ -14,4 +14,4 @@
 #PBS -j oe
 #PBS -o rel_cal.2458099.43869.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py 2458099.43869 --pol 'ee' --flag_type 'first'
+/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py 2458099.43124 --pol 'ee' --flag_type 'first'

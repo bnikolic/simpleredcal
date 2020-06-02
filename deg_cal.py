@@ -139,8 +139,8 @@ def main():
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
     if args.deg_dim == 'jd':
-        # find dataset from specified JD that contains visibilities at the same LAST
         indices = ['jd1', 'jd2', 'freq', 'time_int']
+        # find dataset from specified JD that contains visibilities at the same LAST
         tgt_jd = args.tgt_jd
         if tgt_jd is None:
             tgt_jd = int(float('2458098.43869')) + 1

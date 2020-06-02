@@ -156,10 +156,10 @@ def main():
                     writer.writeheader()
                 initp = None
                 for iter_dim in iter_dims:
-                    res_rel = doRelCal(RedG, cData[iter_dim], \
-                                       distribution=args.dist, initp=initp)
+                    res_rel = doRelCalRP(RedG, cData[iter_dim], \
+                                         distribution=args.dist, initp=initp)
                     res_rel = {key:res_rel[key] for key in slct_keys}
-                    res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
+                    # res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls) # not need for doRelCalRP
                     # expanding out the solution
                     for i, param in enumerate(res_rel['x']):
                         res_rel[i] = param
