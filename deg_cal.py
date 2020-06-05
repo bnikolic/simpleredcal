@@ -108,8 +108,8 @@ def main():
              'jd':'Julian days'}
     print('Running degenerate fitting on adjacent {} for visibility dataset {} '\
           'for frequency channel(s) {} and time integration(s) {}\n'.\
-          format(os.path.basename(find_zen_file(args.jd_time)), \
-          pdict[args.deg_dim], pchans, ptints))
+          format(pdict[args.deg_dim], os.path.basename(find_zen_file(args.jd_time)), \
+          pchans, ptints))
 
     if freq_chans is None:
         freq_chans = numpy.arange(md['Nfreqs'])
