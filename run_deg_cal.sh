@@ -12,6 +12,6 @@
 #PBS -l nodes=1:ppn=4 # default is 1 core on 1 node
 #PBS -l walltime=48:00:00
 #PBS -j oe
-#PBS -o deg_cal.2458098.43869.ee.jd.2458099.gaussian.out
+#PBS -o deg_cal.2458098.43869.ee.jd.2458099.cauchy.out
 
 /lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python deg_cal.py 2458098.43869 --deg_dim jd --pol ee --dist cauchy
