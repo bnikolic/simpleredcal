@@ -804,7 +804,7 @@ class Opt_Constraints:
 
 
 def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, \
-             initp=None):
+             initp=None, max_nit=1000):
     """Do optimal absolute step of redundant calibration
 
     Initial degenerate parameter guesses are 1 for the overall amplitude, and 0
@@ -827,6 +827,8 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     :type ref_ant: int
     :param initp: Initial parameter guesses for gains and degenerate parameters
     :type initp: ndarray, None
+    :param max_nit: Maximum number of iterations to perform
+    :type max_nit: int
 
     :return: Optimization result for the optimally absolutely calibrated
     redundant gains and degenerate parameters
@@ -862,7 +864,8 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     ff = jit(functools.partial(optimal_logLkl, relabelAnts(redg), distribution, \
                                ant_sep, obsvis, rel_vis))
     res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
-                   constraints=cons, bounds=bounds, method='trust-constr')
+                   constraints=cons, bounds=bounds, method='trust-constr', \
+                   options={'maxiter':max_nit})
     print(res['message'])
     return res
 
@@ -898,7 +901,7 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
 
 
 def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
-                initp=None):
+                initp=None, max_nit=1000):
     """
     Fit degenerate redundant calibration parameters so that rel_vis1 is as
     close to as possible to rel_vis1
@@ -919,6 +922,8 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     :type distribution: str
     :param initp: Initial parameter guesses for degenerate parameters
     :type initp: ndarray, None
+    :param max_nit: Maximum number of iterations to perform
+    :type max_nit: int
 
     :return: Optimization result for the solved degenerate parameters that
     translat between the two datasets
@@ -931,6 +936,6 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
-    res = minimize(ff, initp, jac=jacrev(ff))
+    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
     print(res['message'])
     return res

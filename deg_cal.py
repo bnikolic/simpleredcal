@@ -210,7 +210,7 @@ def main():
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
 
                     res_deg = doDegVisVis(redg, antpos, rel_vis1, rel_vis2, \
-                                          distribution=args.dist)
+                                          distribution=args.dist, initp=initp)
                     res_deg = {key:res_deg[key] for key in slct_keys}
                     # expanding out the solution
                     for i, param in enumerate(res_deg['x']):
