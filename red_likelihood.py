@@ -519,140 +519,6 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None, \
     return res, initp
 
 
-def relative_logLklCT(credg, distribution, obsvis, ref_ant_idx, params):
-    """Redundant relative likelihood calculator
-
-    *Polar coordinates*
-
-    *With constraints and bounds*
-
-    We impose that the true sky visibilities from redundant baseline sets are
-    equal, and use this prior to calibrate the visibilities (up to some degenerate
-    parameters). We set the noise for each visibility to be 1.
-
-    Note: parameter order is such that the function can be usefully partially applied.
-
-    :param credg: Grouped baselines, condensed so that antennas are
-    consecutively labelled. See relabelAnts
-    :type credg: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
-    :type distribution: str
-    :param obsvis: Observed sky visibilities for a given frequency and given time,
-    reformatted to have format consistent with credg
-    :type obsvis: ndarray
-    :param ref_ant_idx: Index of reference antenna in ordered list of antennas
-    :type ref_ant_idx: int
-    :param params: Parameters to constrain: redundant visibilities and gains
-    (Re & Im components interweaved for both)
-    :type params: ndarray
-
-    :return: Negative log-likelihood of MLE computation
-    :rtype: float
-    """
-    no_ants = credg[:, 1:].max().item() + 1
-    no_unq_bls = credg[:, 0].max().item() + 1
-    vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
-
-    vis = makeEArray(vis_comps)
-    gains = makeEArray(gain_comps)
-
-    delta = obsvis - gVis(vis, credg, gains)
-    log_likelihood = LLFN[distribution](delta)
-    return log_likelihood
-
-
-class Rel_Constraints:
-    """Gain amplitude and phase constraints for relative redundant calibration
-
-    :param no_unq_bls: Number of unique baselines (equivalently the number of
-    redundant visibilities)
-    :type no_unq_bls: int
-    :param params: Parameters to feed into relative calibration
-    :type params: ndarray
-    """
-    def __init__(self, no_unq_bls):
-        self.no_unq_bls = no_unq_bls
-
-    def avg_amp(self, params):
-        """Constraint that mean of gain amplitudes must be equal to 1
-
-        :return: Residual between mean of gain amplitudes and 1
-        :rtype: float
-        """
-        amps = params[self.no_unq_bls*2::2]
-        return np.mean(amps) - 1
-
-    def avg_phase(self, params):
-        """Constraint that mean of gain phases must be equal to 0
-
-        :return: Residual between circular mean of gain phases and 0
-        :rtype: float
-        """
-        phases = params[self.no_unq_bls*2+1::2]
-        return np.mean(phases)
-
-
-def doRelCalCT(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None, \
-               max_nit=1000):
-    """Do relative step of redundant calibration
-
-    *Polar coordinates*
-
-    *With constraints and bounds*
-
-    Initial parameter guesses, if not specified, are 1*e(0j) for both the gains
-    and the true sky visibilities.
-
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
-    :param obsvis: Observed sky visibilities for a given frequency and given time,
-    reformatted to have format consistent with redg
-    :type obsvis: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
-    :type distribution: str
-    :param initp: Initial parameter guesses for true visibilities and gains
-    :type initp: ndarray, None
-    :param max_nit: Maximum number of iterations to perform
-    :type max_nit: int
-
-    :return: Optimization result for the solved antenna gains and true sky
-    visibilities
-    :rtype: Scipy optimization result object
-    """
-    no_unq_bls = numpy.unique(redg[:, 0]).size
-    ants = numpy.unique(redg[:, 1:])
-    if initp is None:
-        # setup initial parameters
-        # reference antenna gain not included in the initial parameters
-        xvamps = np.zeros(no_unq_bls) # vis amplitudes
-        xvphases = np.zeros(no_unq_bls) # vis phases
-        xgamps = np.ones(ants.size) # gain amplitudes
-        xgphases = np.zeros(ants.size) # gain phases
-        xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
-        xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
-        initp = np.hstack([xvis, xgains])
-
-    lb = numpy.repeat(-np.inf, initp.size)
-    ub = numpy.repeat(np.inf, initp.size)
-    lb[no_unq_bls*2::2] = 0 # lower bound for gain amplitudes
-    bounds = Bounds(lb, ub)
-
-    # constraints for optimization
-    constraints = Rel_Constraints(no_unq_bls)
-    cons = [{'type': 'eq', 'fun': constraints.avg_amp},
-            {'type': 'eq', 'fun': constraints.avg_phase},
-            ]
-
-    ref_ant_idx = condenseMap(ants)[ref_ant]
-    ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
-             distribution, obsvis, ref_ant_idx))
-    res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
-                   constraints=cons, bounds=bounds, method='trust-constr', \
-                   options={'maxiter':max_nit})
-    print(res['message'])
-    return res
-
-
 @jit
 def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     """Transform redundant visibilities according to the degenerate redundant
@@ -894,7 +760,7 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: float
     """
-    w_alpha = degVis(ant_sep, rel_vis1, *params[[0, 2, 3]])
+    w_alpha = degVis(ant_sep, rel_vis1, *params)
     delta = rel_vis2 - w_alpha
     log_likelihood = LLFN[distribution](delta)
     return log_likelihood
@@ -920,7 +786,8 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     :param rel_vis2: ndarray
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
-    :param initp: Initial parameter guesses for degenerate parameters
+    :param initp: Initial parameter guesses for degenerate parameters (overall
+    amplitude, x phase gradient and y phase gradient)
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
@@ -930,12 +797,18 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     :rtype: Scipy optimization result object
     """
     if initp is None:
-        # setup initial params: overall amp & phase, x and y phase gradients
-        initp = np.asarray([1, 0, 0, 0])
+        # setup initial params: overall amp, x and y phase gradients
+        initp = np.asarray([1, 0, 0])
+
+    lb = numpy.repeat(-np.inf, len(initp))
+    ub = numpy.repeat(np.inf, len(initp))
+    lb[0] = 0 # bound for overall amplitude
+    bounds = Bounds(lb, ub)
 
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
-    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
+    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit},
+                   bounds=bounds, method='SLSQP')
     print(res['message'])
     return res

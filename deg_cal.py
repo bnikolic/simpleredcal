@@ -169,7 +169,7 @@ def main():
         rel_df_c = pd.concat([rel_df2, rel_df3])
         # pairing time_ints from rel_df and rel_df_c that match in LAST
         time_ints2 = rel_df_c.index.get_level_values('time_int').unique().values
-        iter_dims = [idim for idim in zip(time_ints, time_ints2)]
+        iter_dims = [idim for idim in zip(time_ints, time_ints2[time_ints])]
         iter_dims = [idim+(freq_chan,) for idim in iter_dims for freq_chan in \
                      freq_chans]
         iter_dims = sorted(iter_dims, key=lambda row: row[2]) # iterate across
@@ -178,7 +178,7 @@ def main():
 
     # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
-    no_deg_params = 4
+    no_deg_params = 3 # overall amplitude, x phase gradient, y phase gradient
     header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
 
     skip_cal = False
@@ -224,8 +224,13 @@ def main():
 
         print('Degenerate fitting results saved to csv file {}'.format(out_csv))
         df = pd.read_csv(out_csv)
-        df.set_index(indices, inplace=True)
+        df_indices = indices.copy()
+        mv_col = df_indices.pop(1)
+        df.set_index(df_indices, inplace=True)
         df.sort_values(by=indices, inplace=True)
+        cols = list(df.columns.values)
+        cols.remove(mv_col)
+        df = df[[mv_col]+cols]
         out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
         df.to_pickle(out_df)
         print('Degenerate fitting results dataframe pickled to {}'.format(out_df))
