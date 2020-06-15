@@ -124,7 +124,7 @@ def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
     plt.legend()
     plt.show()
 
-    if ~df['success'].any():
+    if (~df['success']).any():
         pgbmax = round(numpy.max(df[ycol][~df['success']].values), 3)
     else:
         pgbmax = 'n/a - all minimizations were succesful'
