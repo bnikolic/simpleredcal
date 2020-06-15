@@ -138,7 +138,7 @@ def main():
         psize = (no_ants + no_unq_bls)*2
 
         # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
-        slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
+        slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
         header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
         # remove flagged channels from iter_dims

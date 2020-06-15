@@ -177,7 +177,7 @@ def main():
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
     # removing 'jac', 'hess_inv', 'nfev', 'njev'
-    slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
+    slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
     no_deg_params = 3 # overall amplitude, x phase gradient, y phase gradient
     header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
 
