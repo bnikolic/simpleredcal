@@ -800,15 +800,9 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
         # setup initial params: overall amp, x and y phase gradients
         initp = np.asarray([1, 0, 0])
 
-    lb = numpy.repeat(-np.inf, len(initp))
-    ub = numpy.repeat(np.inf, len(initp))
-    lb[0] = 0 # bound for overall amplitude
-    bounds = Bounds(lb, ub)
-
     ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
-    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit},
-                   bounds=bounds, method='SLSQP')
+    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
     print(res['message'])
     return res

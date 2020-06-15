@@ -70,7 +70,7 @@ def main():
     if args.deg_dim == 'jd':
         tgt_jd = args.tgt_jd
         if tgt_jd is None:
-            tgt_jd = int(args.jd_time) + 1 # choose consecutive JD
+            tgt_jd = int(args.jd_time) + 1 # choose consecutive JD as default
         pjd = '.' + str(tgt_jd)
 
     out_fn = args.out
@@ -176,7 +176,7 @@ def main():
         # LAST first - should speed up fitting
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
-    # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
+    # removing 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status','message', 'fun', 'nit', 'x']
     no_deg_params = 3 # overall amplitude, x phase gradient, y phase gradient
     header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
@@ -209,6 +209,10 @@ def main():
                     rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
 
+                    # we do not reuse previous solutions to initialize the next
+                    # solver in the iteration, as we find that we get stuck
+                    # in local minima, especially after iterations that have
+                    # bad data (due to e.g. RFI)
                     res_deg = doDegVisVis(redg, antpos, rel_vis1, rel_vis2, \
                                           distribution=args.dist, initp=initp)
                     res_deg = {key:res_deg[key] for key in slct_keys}
@@ -216,10 +220,11 @@ def main():
                     for i, param in enumerate(res_deg['x']):
                         res_deg[i] = param
                     # use solution for next solve in iteration
-                    if res_deg['success']:
-                        initp = res_deg['x']
+                    # if res_deg['success']:
+                    #     initp = res_deg['x']
                     del res_deg['x']
-                    res_deg.update({indices[i]:iter_dim[i] for i in range(3)})
+                    res_deg.update({indices[i]:iter_dim[i] for i in \
+                                    range(no_deg_params)})
                     writer.writerow(res_deg) # writing to csv
 
         print('Degenerate fitting results saved to csv file {}'.format(out_csv))
