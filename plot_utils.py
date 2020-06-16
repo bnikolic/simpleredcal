@@ -3,7 +3,10 @@
 
 import os
 
+import matplotlib
 import numpy
+import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
 
 
@@ -134,3 +137,33 @@ def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
 
     print('Max {} for minimizations with {}=True: {}'.format(ylab_dict[ycol], \
           group_by, round(numpy.max(df[ycol][df['success']].values), 3)))
+
+
+import matplotlib.ticker as ticker
+
+def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
+                     figsize=(11,7)):
+    """Plot heatmap of results of redundant calibration
+
+    :param df: Results dataframe
+    :type df: DataFrame
+    :param value: Values of pivoted dataframe
+    :type value: str
+    :param index: Index of pivoted dataframe
+    :type index: str
+    :param columns: Columns of pivoted dataframe
+    :type columns: str
+    :param vmax: Maximum value of heatmap
+    :type vmax: float
+    :param figsize: Figure size of plot
+    :type figsize: tuple
+    """
+    piv = pd.pivot_table(df, values=value, index=index, columns=columns)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax = sns.heatmap(piv, vmax=vmax, cmap=sns.cm.rocket_r)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-50))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    plt.tight_layout()
+    plt.show()
