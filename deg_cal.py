@@ -202,9 +202,9 @@ def main():
                 initp = None
                 for iter_dim in iter_dims:
                     # get relatively calibrated solutions
-                    resx1 = rel_df.loc[iter_dim[a], iter_dim[c]][len(slct_keys)-1:]\
+                    resx1 = rel_df.loc[iter_dim[a], iter_dim[c]][len(slct_keys)-1:-2]\
                     .values.astype(float)
-                    resx2 = rel_df_c.loc[iter_dim[b], iter_dim[d]][len(slct_keys)-1:]\
+                    resx2 = rel_df_c.loc[iter_dim[b], iter_dim[d]][len(slct_keys)-1:-2]\
                     .values.astype(float)
                     rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)

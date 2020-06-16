@@ -26,6 +26,7 @@ import numpy
 
 from hera_cal.io import HERAData
 
+from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCal, doRelCalRP, group_data, norm_rel_sols
 from red_utils import find_flag_file, find_zen_file, fn_format, get_bad_ants, \
 mod_str_arg, new_fn
@@ -111,7 +112,7 @@ def main():
 
     indices = ['freq', 'time_int']
 
-    iter_dims = list(numpy.ndindex((freq_chans.size, time_ints.size)))
+    iter_dims = list(numpy.ndindex((len(freq_chans), len(time_ints))))
     skip_cal = False
     if csv_exists:
         # skipping freqs and tints that are already in csv file
@@ -127,7 +128,7 @@ def main():
             skip_cal = True
 
     if not skip_cal:
-        hd, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
+        _, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
                                      bad_ants, flag_path=flag_fn)
         flags = cData.mask
         cData = cData.data
@@ -177,7 +178,10 @@ def main():
         df.set_index(indices, inplace=True)
         df.sort_values(by=indices, inplace=True)
         out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
-        df.to_pickle(out_df)
+        # we now append the residuals as additional columns
+        # the dataframe is also saved to pickle file format at this stage
+        df = append_residuals_rel(df, pkl_df=True, out_fn=out_df, cdata=cData, \
+                                  redg=RedG)
         print('Relative calibration results dataframe pickled to {}'.format(out_df))
 
         # creating metadata file

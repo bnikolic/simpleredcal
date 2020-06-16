@@ -16,9 +16,10 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
+from fit_diagnostics import norm_residuals
 from red_likelihood import doRelCal, group_data, norm_rel_sols
 from red_utils import find_zen_file, fn_format, get_bad_ants, new_fn, \
-norm_residuals, split_rel_results
+split_rel_results
 
 
 def main():
@@ -42,8 +43,8 @@ def main():
     the relative redundant calibration for each set of randomly chosen frequency
     channel and time integration slices chosen from the rel_df results dataframe
     """))
-    parser.add_argument('rel_df', help='Relative calibration results dataframe', \
-                        metavar='df', type=str)
+    parser.add_argument('rel_df', help='Relative calibration results dataframe \
+                        in pickle file format', metavar='df', type=str)
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-c', '--no_checks', required=False, default=50, \
@@ -90,8 +91,9 @@ def main():
               format(args.rel_df))
 
         rel_df = pd.read_pickle(args.rel_df)
+        no_checks = min(no_checks, len(rel_df.index))
         rnd_idxs = numpy.random.choice(rel_df.index.values, no_checks, \
-                                        replace=False)
+                                       replace=False)
         rnd_chans = numpy.unique([rnd_idx[0] for rnd_idx in rnd_idxs])
         fmap = dict(map(reversed, enumerate(rnd_chans)))
 
@@ -125,7 +127,7 @@ def main():
                     # checking results
                     res_rel[match_keys[0]] = numpy.abs(norm_residuals(rel_df.\
                         loc[iter_dim]['fun'], res_rel['fun'])) < args.tol
-                    res_gamp = numpy.abs(split_rel_results(rel_df.loc[iter_dim][5:].\
+                    res_gamp = numpy.abs(split_rel_results(rel_df.loc[iter_dim][5:-2].\
                                          values.astype(float), no_unq_bls)[1])
                     check_gamp = numpy.abs(split_rel_results(res_rel['x'], \
                                            no_unq_bls)[1])

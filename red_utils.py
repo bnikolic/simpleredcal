@@ -232,34 +232,6 @@ def split_rel_results(resx, no_unq_bls, coords='cartesian'):
     return res_vis, res_gains
 
 
-def norm_residuals(x_meas, x_pred):
-    """Evaluates the residual between the measured and predicted quantities,
-    normalized by the absolute value of their product
-
-    :param x_meas: Measurement
-    :type x_meas: ndarray
-    :param x_pred: Prediction
-    :type x_pred: ndarray
-
-    :return: Normalized residual
-    :rtype: ndarray
-    """
-    return (x_meas - x_pred) / numpy.sqrt(numpy.abs(x_meas)*numpy.abs(x_pred))
-
-
-def abs_residuals(residuals):
-    """Return median absolute residuals for both real and imag parts
-
-    :param residuals: Residuals
-    :type residuals: ndarray
-
-    :return: Median absolute residuals, separately for Re and Im
-    :rtype: list
-    """
-    return [numpy.median(numpy.absolute(getattr(residuals, i))) \
-            for i in ('real', 'imag')]
-
-
 def mod_str_arg(str_arg):
     """Returns int, ndarray or None, which is readable by group_data
 
