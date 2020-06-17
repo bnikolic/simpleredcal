@@ -55,6 +55,8 @@ def main():
                         to match')
     parser.add_argument('-w', '--overwrite', required=False, action='store_true', \
                         help='Overwrite existing check csv and dataframe')
+    parser.add_argument('-k', '--keep_csv', required=False, action='store_true', \
+                        help='Keep csv file')
     args = parser.parse_args()
 
     startTime = datetime.datetime.now()
@@ -143,14 +145,19 @@ def main():
                                     indices[1]:iter_dim[1]})
                     writer.writerow(res_rel)
 
-        print('Checked relative calibration results saved to csv file {}'.format(out_csv))
-
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         df.sort_values(by=indices, inplace=True)
         df.to_pickle(out_df)
 
-        print('Checked relative calibration results dataframe pickled to {}\n'.format(out_df))
+        if not args.keep_csv:
+            os.remove(out_csv)
+        else:
+            print('Checked relative calibration results saved to csv file {}'.\
+                  format(out_csv))
+
+        print('Checked relative calibration results dataframe pickled to {}\n'.\
+              format(out_df))
 
     else:
         df = pd.read_pickle(out_df)
