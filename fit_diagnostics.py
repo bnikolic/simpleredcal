@@ -4,7 +4,7 @@
 import numpy
 import pandas as pd
 
-from red_likelihood import group_data, gVis, relabelAnts
+from red_likelihood import degVis, group_data, gVis, red_ant_sep, relabelAnts
 from red_utils import find_flag_file, find_zen_file, get_bad_ants, \
 split_rel_results
 
@@ -38,7 +38,7 @@ def abs_residuals(residuals):
 
 
 def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
-    """Calculates the residuals and normalized for the relative redundant
+    """Calculates the residuals and normalized residuals for the relative redundant
     calibration fitting, for each frequency and time integration slice, and
     appends the residual results to the existing relative calibration results
     dataframe.
@@ -68,9 +68,9 @@ def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
         freqs = rel_df['freq'].unique()
         tints = rel_df['time_int'].unique()
 
-        def calc_residuals(row):
-            """Calculate residual and normalized residual to append to results
-            dataframe
+        def calc_rel_residuals(row):
+            """Calculate residual and normalized residual to append to relative
+            calibration results dataframe
 
             :param row: Row of the relative calibration results dataframe
             :type row: Series
@@ -89,10 +89,84 @@ def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
             norm_rel_residuals = norm_residuals(obs_vis, pred_rel_vis)
             return pd.Series([rel_residuals, norm_rel_residuals])
 
-        rel_df[residual_cols] = rel_df.apply(lambda row: calc_residuals(row), axis=1)
+        rel_df[residual_cols] = rel_df.apply(lambda row: calc_rel_residuals(row), \
+                                             axis=1)
         rel_df.set_index(idxs, inplace=True)
 
         if out_fn is not None:
             rel_df.to_pickle(out_fn)
 
     return rel_df
+
+
+def append_residuals_deg(deg_df, rel_df1, rel_df2, md, out_fn=None):
+    """Calculates the residuals and normalized residuals for the degenerate
+    parameter fitting for each frequency and time integration slice, and
+    appends the residual results to the existing degenerate fitting results
+    dataframe.
+
+    :param deg_df: Degenerate fitting results dataframe
+    :type deg_df: DataFrame
+    :param rel_df1:
+    :type rel_df1: DataFrame
+    :param rel_df2:
+    :type rel_df2: DataFrame
+    :param md: Metadata for visibility dataset corresponding to deg_df
+    :type md: dict
+    :param out_fn: Output dataframe file name. If None, file not pickled.
+    :type out_fn: str, None
+
+    :return: Degenerate fitting results dataframe, with residual columns appended
+    :rtype: DataFrame
+    """
+    residual_cols = ['residual', 'norm_residual']
+    if set(residual_cols).issubset(deg_df.columns.values):
+        print('Residuals already appended to dataframe - exiting')
+    else:
+        print('Appending residuals to dataframe')
+        ant_sep = red_ant_sep(md['redg'], md['antpos'])
+        idxs = list(deg_df.index.names)
+        deg_df.reset_index(inplace=True)
+        deg_cols = deg_df.columns.values
+
+        def calc_deg_residuals(row):
+            """Calculate residual and normalized residual to append to degenerate
+            fitting results dataframe
+
+            :param row: Row of the degenerate fitting results dataframe
+            :type row: Series
+
+            :return: Residual columns to append to dataframe
+            :rtype: Series
+            """
+            cidx = len([col for col in rel_df1.columns.values if not \
+                   col.isdigit()]) - 2
+            if 'time_int' not in deg_cols:
+                A = row['freq']
+                B = A
+                C = row['time_int1']
+                D = row['time_int2']
+            elif 'freq' not in deg_cols:
+                A = row['freq1']
+                B = row['freq2']
+                C = row['time_int']
+                D = C
+            resx1 = rel_df1.loc[A, C][cidx:-2]\
+            .values.astype(float)
+            resx2 = rel_df2.loc[B, D][cidx:-2]\
+            .values.astype(float)
+            rel_vis1, _ = split_rel_results(resx1, md['no_unq_bls'])
+            rel_vis2, _ = split_rel_results(resx2, md['no_unq_bls'])
+            deg_w_alpha = degVis(ant_sep, rel_vis1, *row[-3:].values.astype(float))
+            deg_residuals = rel_vis2 - deg_w_alpha
+            norm_deg_residuals = norm_residuals(rel_vis2, deg_w_alpha)
+            return pd.Series([deg_residuals, norm_deg_residuals])
+
+        deg_df[residual_cols] = deg_df.apply(lambda row: calc_deg_residuals(row), \
+                                             axis=1)
+        deg_df.set_index(idxs, inplace=True)
+
+        if out_fn is not None:
+            deg_df.to_pickle(out_fn)
+
+    return deg_df

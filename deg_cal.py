@@ -24,6 +24,7 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
+from fit_diagnostics import append_residuals_deg
 from red_likelihood import doDegVisVis
 from red_utils import find_nearest, find_rel_df, find_zen_file, fn_format, \
 lst_to_jd_time, match_lst, mod_str_arg, new_fn, split_rel_results
@@ -237,7 +238,9 @@ def main():
         cols.remove(mv_col)
         df = df[[mv_col]+cols]
         out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
-        df.to_pickle(out_df)
+        # we now append the residuals as additional columns
+        # the dataframe is also saved to pickle file format at this stage
+        df = append_residuals_deg(df, rel_df, rel_df_c, md, out_fn=out_df)
         print('Degenerate fitting results dataframe pickled to {}'.format(out_df))
 
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
