@@ -180,8 +180,7 @@ def main():
         out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
         # we now append the residuals as additional columns
         # the dataframe is also saved to pickle file format at this stage
-        df = append_residuals_rel(df, pkl_df=True, out_fn=out_df, cdata=cData, \
-                                  redg=RedG)
+        df = append_residuals_rel(df, cData, RedG, out_fn=out_df)
         print('Relative calibration results dataframe pickled to {}'.format(out_df))
 
         # creating metadata file

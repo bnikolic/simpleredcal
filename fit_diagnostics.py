@@ -37,68 +37,34 @@ def abs_residuals(residuals):
             for i in ('real', 'imag')]
 
 
-def append_residuals_rel(rel_df, pkl_df=False, out_fn=None, cdata=None, \
-                         redg=None):
+def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
     """Calculates the residuals and normalized for the relative redundant
     calibration fitting, for each frequency and time integration slice, and
     appends the residual results to the existing relative calibration results
     dataframe.
 
-    :param rel_df: (Path of) relative calibration results dataframe. Path
-    must be to pickled dataframe.
-    file format
-    :type rel_df: DataFrame, str
-    :param pkl_df: If True, saves dataframe to pickle. If rel_df is a str, and
-    out_fn is not specified, then overwrites rel_df, else must specify out_fn.
-    :type pkl_df: bool
-    :param out_fn: Output dataframe file name
-    :type out_fn: str
+    :param rel_df: Relative calibration results dataframe
+    :type rel_df: DataFrame
     :param cdata: Grouped visibilities with flags in numpy MaskedArray format,
     with format consistent with redg and dimensions (freq chans,
     time integrations, baselines)
     :type cdata: MaskedArray
     :param redg: Grouped baselines, as returned by groupBls
     :type redg: ndarray
+    :param out_fn: Output dataframe file name. If None, file not pickled.
+    :type out_fn: str, None
 
     :return: Relative calibration results dataframe, with residual columns appended
     :rtype: DataFrame
     """
-    if isinstance(rel_df, pd.DataFrame) and pkl_df:
-        if not isinstance(out_fn, str):
-            raise ValueError('Specify out_fn to save pickled dataframe')
-    if isinstance(rel_df, str):
-        if pkl_df and out_fn is None:
-            out_fn = rel_df
-        rel_df = pd.read_pickle(rel_df)
-    if not isinstance(rel_df, pd.DataFrame):
-        raise ValueError('rel_df must be either a relative calibration results '\
-            'dataframe, or a path to such a dataframe in pickle file format')
-
     residual_cols = ['residual', 'norm_residual']
     if set(residual_cols).issubset(rel_df.columns.values):
         print('Residuals already appended to dataframe - exiting')
     else:
         print('Appending residuals to dataframe')
-
-        if cdata is None or redg is None:
-            sout = out_fn.split('.')
-            jd_time = float('{}.{}'.format(sout[1], sout[2]))
-            pol = sout[3]
-            dist = sout[4]
-
-            zen_fn = find_zen_file(jd_time)
-            bad_ants = get_bad_ants(zen_fn)
-            flags_fn = find_flag_file(jd_time, 'first')
-
-            hdraw, redg, cMData = group_data(zen_fn, pol, None, None, bad_ants, \
-                                             flags_fn)
-            cdata = cMData.filled()
-
         no_unq_bls = numpy.unique(redg[:, 0]).size
-
         idxs = list(rel_df.index.names)
         rel_df.reset_index(inplace=True)
-
         freqs = rel_df['freq'].unique()
         tints = rel_df['time_int'].unique()
 
@@ -126,7 +92,7 @@ def append_residuals_rel(rel_df, pkl_df=False, out_fn=None, cdata=None, \
         rel_df[residual_cols] = rel_df.apply(lambda row: calc_residuals(row), axis=1)
         rel_df.set_index(idxs, inplace=True)
 
-        if pkl_df:
+        if out_fn is not None:
             rel_df.to_pickle(out_fn)
 
     return rel_df
