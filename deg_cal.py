@@ -7,6 +7,10 @@ $ python deg_cal.py 2458098.43869 --deg_dim freq --pol ee --chans 300~301 --tint
 Can then read the results dataframe with:
 > pd.read_pickle('deg_df.2458098.43869.ee.freq.cauchy.pkl')
 
+In the current setup, we do not reuse previous solutions to initialize the next
+solver in the iteration, as we find that we get stuck in local minima, especially
+after iterations that have bad data (due to e.g. RFI)
+
 Note that default is to write all solutions to the same csv file, for each
 visibility dataset
 """
@@ -71,7 +75,8 @@ def main():
     if args.deg_dim == 'jd':
         tgt_jd = args.tgt_jd
         if tgt_jd is None:
-            tgt_jd = int(args.jd_time) + 1 # choose consecutive JD as default
+            # choose consecutive JD as default
+            tgt_jd = int(args.jd_time) + 1
         pjd = '.' + str(tgt_jd)
 
     out_fn = args.out
@@ -210,23 +215,19 @@ def main():
                     rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
 
-                    # we do not reuse previous solutions to initialize the next
-                    # solver in the iteration, as we find that we get stuck
-                    # in local minima, especially after iterations that have
-                    # bad data (due to e.g. RFI)
                     res_deg = doDegVisVis(redg, antpos, rel_vis1, rel_vis2, \
                                           distribution=args.dist, initp=initp)
                     res_deg = {key:res_deg[key] for key in slct_keys}
                     # expanding out the solution
                     for i, param in enumerate(res_deg['x']):
                         res_deg[i] = param
-                    # use solution for next solve in iteration
+                    # to use solution for next solve in iteration
                     # if res_deg['success']:
                     #     initp = res_deg['x']
                     del res_deg['x']
                     res_deg.update({indices[i]:iter_dim[i] for i in \
                                     range(no_deg_params)})
-                    writer.writerow(res_deg) # writing to csv
+                    writer.writerow(res_deg)
 
         print('Degenerate fitting results saved to csv file {}'.format(out_csv))
         df = pd.read_csv(out_csv)

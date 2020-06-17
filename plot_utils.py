@@ -8,6 +8,7 @@ import numpy
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
+from matplotlib import ticker
 
 
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
@@ -138,8 +139,6 @@ def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
     print('Max {} for minimizations with {}=True: {}'.format(ylab_dict[ycol], \
           group_by, round(numpy.max(df[ycol][df['success']].values), 3)))
 
-
-import matplotlib.ticker as ticker
 
 def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
                      figsize=(11,7)):

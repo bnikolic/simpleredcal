@@ -138,7 +138,7 @@ def main():
         no_unq_bls = numpy.unique(RedG[:, 0]).size
         psize = (no_ants + no_unq_bls)*2
 
-        # not keeping 'jac', 'hess_inv', 'nfev', 'njev'
+        # discarding 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
         header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
@@ -170,7 +170,7 @@ def main():
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
                                     indices[1]:time_ints[iter_dim[1]]})
-                    writer.writerow(res_rel) # writing to csv
+                    writer.writerow(res_rel)
 
         print('Relative calibration results saved to csv file {}'.format(out_csv))
 
