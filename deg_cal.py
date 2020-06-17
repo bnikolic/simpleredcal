@@ -149,7 +149,6 @@ def main():
                      freq_chans] # adding frequency channels
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
 
-    rel_df_c = rel_df
     if args.deg_dim == 'jd':
         indices = ['time_int1', 'time_int2', 'freq']
         # find dataset from specified JD that contains visibilities at the same LAST
@@ -181,6 +180,8 @@ def main():
         iter_dims = sorted(iter_dims, key=lambda row: row[2]) # iterate across
         # LAST first - should speed up fitting
         a, b, c, d = 2, 2, 0, 1 # for iteration indexing
+    else:
+        rel_df_c = rel_df
 
     # removing 'jac', 'hess_inv', 'nfev', 'njev'
     slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
