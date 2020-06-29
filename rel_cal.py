@@ -112,7 +112,8 @@ def main():
 
     indices = ['freq', 'time_int']
 
-    iter_dims = list(numpy.ndindex((len(freq_chans), len(time_ints))))
+    no_tints = len(time_ints)
+    iter_dims = list(numpy.ndindex((len(freq_chans), no_tints)))
     skip_cal = False
     if csv_exists:
         # skipping freqs and tints that are already in csv file
@@ -156,7 +157,7 @@ def main():
                 if not csv_exists:
                     writer.writeheader()
                 initp = None
-                for iter_dim in iter_dims:
+                for i, iter_dim in enumerate(iter_dims):
                     res_rel = doRelCal(RedG, cData[iter_dim], \
                                        distribution=args.dist, initp=initp)  # res_rel, initp_ = for doRelCalRP
                     res_rel = {key:res_rel[key] for key in slct_keys}
@@ -167,6 +168,8 @@ def main():
                     # use solution for next solve in iteration
                     if res_rel['success']:
                         initp = res_rel['x'] # initp_ = initp
+                    if not i%no_tints: # reset initp after each frequency slice
+                        initp = None
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
                                     indices[1]:time_ints[iter_dim[1]]})
