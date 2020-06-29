@@ -158,17 +158,27 @@ def main():
                     writer.writeheader()
                 initp = None
                 for i, iter_dim in enumerate(iter_dims):
-                    res_rel = doRelCal(RedG, cData[iter_dim], \
-                                       distribution=args.dist, initp=initp)  # res_rel, initp_ = for doRelCalRP
+                    # res_rel = doRelCal(RedG, cData[iter_dim], \
+                    #                    distribution=args.dist, initp=initp)
+                    # res_rel = {key:res_rel[key] for key in slct_keys}
+                    # res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
+                    # # use solution for next solve in iteration
+                    # if res_rel['success']:
+                    #     initp = res_rel['x'] # initp_ = initp
+
+                    # using doRelCalRP (reduced number of paramters, in polar coords)
+                    res_rel, initp_ = doRelCalRP(RedG, cData[iter_dim], \
+                                                 distribution=args.dist, initp=initp)
                     res_rel = {key:res_rel[key] for key in slct_keys}
-                    res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls) # not need for doRelCalRP
+                    # use solution for next solve in iteration
+                    if res_rel['success']:
+                        initp = initp_
+
                     # expanding out the solution
                     for i, param in enumerate(res_rel['x']):
                         res_rel[i] = param
-                    # use solution for next solve in iteration
-                    if res_rel['success']:
-                        initp = res_rel['x'] # initp_ = initp
-                    if not i%no_tints: # reset initp after each frequency slice
+                    # reset initp after each frequency slice
+                    if not i%no_tints:
                         initp = None
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
