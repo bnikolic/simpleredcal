@@ -4,12 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-jupyter = "*"
-pandas = "*"
-matplotlib = "*"
-seaborn = "*"
+hera_cal = "*"
 jax = "*"
 jaxlib = "*"
+jupyter = "*"
+matplotlib = "*"
+numpy = "*"
+pandas = "*"
+pyuvdata = "*"
+seaborn = "*"
 
 [dev-packages]
 
