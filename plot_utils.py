@@ -166,3 +166,44 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
     ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
     plt.tight_layout()
     plt.show()
+
+
+def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
+                    xbase=50, ybase=5, cmap=None, center=None, figsize=(14, 7)):
+    """Plots heatmap of visibility-related data, with vmax set as a percentile
+    of the dataframe
+
+    :param arr: 2D array
+    :type arr: ndarray
+    :param ylabel: ylabel of the plot
+    :type ylabel: str
+    :param xlabel: xlabel of the plot
+    :type xlabel: str
+    :param clip_pctile: Percentile to clip the data shown in the heatmap - used
+    to set vmax
+    :type clip_pctile: int, float
+    :param xbase: x axis limits and tickets are multiples of this value
+    :type xbase: int
+    :param ybase: x axis limits and tickets are multiples of this value
+    :type ybase: int
+    :param cmap: Colour mapping from data values to colour space
+    :type cmap: str, matplotlib colormap name or object, list
+    :param center: Value at which to center the colourmap
+    :type center: float
+    :param figsize: Figure size of plot
+    :type figsize: tuple
+
+    :return: Tuple of Figure and Axes objects, as usually returned by
+    matplotlib.pyplot.subplots
+    :rtype: tuple
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax = sns.heatmap(arr, vmax=numpy.ceil(numpy.nanpercentile(arr, \
+                     clip_pctile)*100)/100, cmap=cmap, center=0)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
+    ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    return fig, ax
