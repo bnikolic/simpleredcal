@@ -65,6 +65,9 @@ def main():
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
                         type=float, help='JD day for fitting across JDs - only if \
                         deg_dim = "jd". Default to pick consecutive JD day')
+    parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
+                        type=str, help='Directory in which relative calibration \
+                        results dataframes are located')
     parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
@@ -85,23 +88,25 @@ def main():
                                                args.deg_dim, pjd, args.dist)
 
     out_csv = fn_format(out_fn, 'csv')
+    out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
     csv_exists = os.path.exists(out_csv)
-    if csv_exists:
+    pkl_exists = os.path.exists(out_pkl)
+    if csv_exists or pkl_exists:
         if args.new_csv:
             out_csv = new_fn(out_csv, None, startTime)
+            out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
             csv_exists = False
-
-    out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
-    pkl_exists = os.path.exists(out_pkl)
+            pkl_exists = False
 
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
-    rel_df_path = find_rel_df(args.jd_time, args.pol, args.dist)
+    rel_df_path = find_rel_df(args.jd_time, args.pol, args.dist, args.rel_dir)
     rel_df = pd.read_pickle(rel_df_path)
 
     # retrieving visibility metadata
-    with open(rel_df_path.rsplit('.', 2)[0] + '.md.pkl', 'rb') as f:
+    md_fn = 'rel_df.{}.{}.md.pkl'.format(args.jd_time, args.pol)
+    with open(md_fn, 'rb') as f:
         md = pickle.load(f)
     antpos = md['antpos']
     no_unq_bls = md['no_unq_bls']
@@ -156,7 +161,7 @@ def main():
         indices = ['time_int1', 'time_int2', 'freq']
         # find dataset from specified JD that contains visibilities at the same LAST
         jd_time2 = match_lst(args.jd_time, tgt_jd)
-        rel_df_path2 = find_rel_df(jd_time2, args.pol, args.dist)
+        rel_df_path2 = find_rel_df(jd_time2, args.pol, args.dist, args.rel_dir)
         # aligning datasets in LAST
         last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
         last1 = last_df[last_df['JD_time'] == args.jd_time]['LASTs'].values[0]
@@ -168,7 +173,7 @@ def main():
 
         next_row = numpy.where(last_df['JD_time'] == jd_time2)[0][0] + 1
         rel_df_path3 = find_rel_df(last_df.iloc[next_row]['JD_time'], args.pol, \
-                                   args.dist)
+                                   args.dist, args.rel_dir)
         rel_df3 = pd.read_pickle(rel_df_path3)
         rel_df3 = rel_df3[rel_df3.index.get_level_values('time_int') < offset]
 
@@ -206,6 +211,12 @@ def main():
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_pkl))
             skip_cal = True
+
+    if not iter_dims:
+        raise ValueError('No frequency channels or time integrations to '\
+                         'iterate over - check that the specified --chans '\
+                         'and --tints exist in the relative calibration '\
+                         'results dataframes')
 
     if not skip_cal:
         stdout = io.StringIO()

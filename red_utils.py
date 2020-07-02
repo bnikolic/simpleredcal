@@ -2,6 +2,7 @@
 
 
 import datetime
+import glob
 import os
 import pickle
 import re
@@ -70,7 +71,7 @@ def find_flag_file(JD_time, cal_type):
     return flg_path
 
 
-def find_rel_df(JD_time, pol, dist):
+def find_rel_df(JD_time, pol, dist, dir=None):
     """Returns relative calibration results dataframe path for the specified
     JD_time
 
@@ -80,13 +81,24 @@ def find_rel_df(JD_time, pol, dist):
     :type pol: str
     :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
     :type dist: str
+    :param dir: Directory in which dataframes are located
+    :type dir: str
 
     :return: File path of relative calibration results dataframe
     :rtype: str
     """
-    df_path = './rel_df.{}.{}.{}.pkl'.format(JD_time, pol, dist)
+    dir_path = '.'
+    if dir is not None:
+        dir_path = dir
+    df_path = '{}/rel_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, dist)
     if not os.path.exists(df_path):
-        raise ValueError('DataFrame {} not found'.format(df_path))
+        df_glob = glob.glob('{}/rel_df.{}.{}.{}.*.pkl'.format(dir_path, \
+                            JD_time, pol, dist))
+        if not df_glob:
+            raise ValueError('DataFrame {} not found'.format(df_path))
+        else:
+            df_glob.sort(reverse=True) # get latest result as default
+            df_path = df_glob[0]
     return df_path
 
 
