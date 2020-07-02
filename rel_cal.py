@@ -81,6 +81,9 @@ def main():
             out_csv = new_fn(out_csv, None, startTime)
             csv_exists = False
 
+    out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
+    pkl_exists = os.path.exists(out_pkl)
+
     zen_fn = find_zen_file(args.jd_time)
     bad_ants = get_bad_ants(zen_fn)
 
@@ -115,17 +118,22 @@ def main():
     no_tints = len(time_ints)
     iter_dims = list(numpy.ndindex((len(freq_chans), no_tints)))
     skip_cal = False
-    if csv_exists:
-        # skipping freqs and tints that are already in csv file
-        df = pd.read_csv(out_csv, usecols=indices)
+    if csv_exists or pkl_exists:
         cmap_f = dict(map(reversed, enumerate(freq_chans)))
         cmap_t = dict(map(reversed, enumerate(time_ints)))
-        done = [(cmap_f[f], cmap_t[t]) for (f, t) in df.values if (f in freq_chans \
+        if csv_exists:
+            df = pd.read_csv(out_csv, usecols=indices)
+            idx_arr = df.values
+        elif pkl_exists:
+            df = pd.read_pickle(out_pkl)
+            idx_arr = df.index.values
+        # skipping freqs and tints that are already in the dataframe
+        done = [(cmap_f[f], cmap_t[t]) for (f, t) in idx_arr if (f in freq_chans \
         and t in time_ints)]
         iter_dims = [idim for idim in iter_dims if idim not in done]
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time '\
-                  'integrations already exist in {}\n'.format(out_csv))
+                  'integrations already exist in {}\n'.format(out_pkl))
             skip_cal = True
 
     if not skip_cal:
@@ -190,14 +198,13 @@ def main():
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         df.sort_values(by=indices, inplace=True)
-        out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
         # we now append the residuals as additional columns
         # the dataframe is also saved to pickle file format at this stage
-        df = append_residuals_rel(df, cData, RedG, out_fn=out_df)
-        print('Relative calibration results dataframe pickled to {}'.format(out_df))
+        df = append_residuals_rel(df, cData, RedG, out_fn=out_pkl)
+        print('Relative calibration results dataframe pickled to {}'.format(out_pkl))
 
         # creating metadata file
-        out_md = out_df.rsplit('.', 2)[0] + '.md.pkl'
+        out_md = out_pkl.rsplit('.', 2)[0] + '.md.pkl'
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
                   'antpos':hd.antpos, 'last':hd.lsts, 'Nfreqs':hd.Nfreqs, \
