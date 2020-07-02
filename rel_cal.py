@@ -64,25 +64,27 @@ def main():
     parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
-    parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
-                        help='Write data to a new csv file')
+    parser.add_argument('-n', '--new_df', required=False, action='store_true', \
+                        help='Write data to a new dataframe')
     args = parser.parse_args()
 
     startTime = datetime.datetime.now()
 
     out_fn = args.out
+    default_fn = 'rel_df.{}.{}.{}'.format(args.jd_time, args.pol, args.dist)
     if out_fn is None:
-        out_fn = 'rel_df.{}.{}.{}'.format(args.jd_time, args.pol, args.dist)
+        out_fn = default_fn
 
     out_csv = fn_format(out_fn, 'csv')
-    csv_exists = os.path.exists(out_csv)
-    if csv_exists:
-        if args.new_csv:
-            out_csv = new_fn(out_csv, None, startTime)
-            csv_exists = False
-
     out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
+    csv_exists = os.path.exists(out_csv)
     pkl_exists = os.path.exists(out_pkl)
+    if csv_exists or pkl_exists:
+        if args.new_df:
+            out_csv = new_fn(out_csv, None, startTime)
+            out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
+            csv_exists = False
+            pkl_exists = False
 
     zen_fn = find_zen_file(args.jd_time)
     bad_ants = get_bad_ants(zen_fn)
@@ -204,7 +206,7 @@ def main():
         print('Relative calibration results dataframe pickled to {}'.format(out_pkl))
 
         # creating metadata file
-        out_md = out_pkl.rsplit('.', 2)[0] + '.md.pkl'
+        out_md = default_fn.rsplit('.', 1)[0] + '.md.pkl'
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
                   'antpos':hd.antpos, 'last':hd.lsts, 'Nfreqs':hd.Nfreqs, \
