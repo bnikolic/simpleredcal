@@ -91,6 +91,9 @@ def main():
             out_csv = new_fn(out_csv, None, startTime)
             csv_exists = False
 
+    out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
+    pkl_exists = os.path.exists(out_pkl)
+
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
 
@@ -189,14 +192,19 @@ def main():
     header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
 
     skip_cal = False
-    if csv_exists:
-        # skipping freqs and tints that are already in csv file
-        df = pd.read_csv(out_csv, usecols=indices)
+    # skipping freqs and tints that are already in dataframe
+    if csv_exists or pkl_exists:
+        if csv_exists:
+            df = pd.read_csv(out_csv, usecols=indices)
+            idx_arr = df.values
+        elif pkl_exists:
+            df = pd.read_pickle(out_pkl)
+            idx_arr = df.reset_index()[indices].values
         iter_dims = [idim for idim in iter_dims if not \
-            numpy.equal(df.values, numpy.asarray(idim)).all(1).any()]
+            numpy.equal(idx_arr, numpy.asarray(idim)).all(1).any()]
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time '\
-                  'integrations already exist in {}\n'.format(out_csv))
+                  'integrations already exist in {}\n'.format(out_pkl))
             skip_cal = True
 
     if not skip_cal:
@@ -239,11 +247,10 @@ def main():
         cols = list(df.columns.values)
         cols.remove(mv_col)
         df = df[[mv_col]+cols]
-        out_df = out_csv.rsplit('.', 1)[0] + '.pkl'
         # we now append the residuals as additional columns
         # the dataframe is also saved to pickle file format at this stage
-        df = append_residuals_deg(df, rel_df, rel_df_c, md, out_fn=out_df)
-        print('Degenerate fitting results dataframe pickled to {}'.format(out_df))
+        df = append_residuals_deg(df, rel_df, rel_df_c, md, out_fn=out_pkl)
+        print('Degenerate fitting results dataframe pickled to {}'.format(out_pkl))
 
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
 

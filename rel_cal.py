@@ -118,6 +118,7 @@ def main():
     no_tints = len(time_ints)
     iter_dims = list(numpy.ndindex((len(freq_chans), no_tints)))
     skip_cal = False
+    # skipping freqs and tints that are already in the dataframe
     if csv_exists or pkl_exists:
         cmap_f = dict(map(reversed, enumerate(freq_chans)))
         cmap_t = dict(map(reversed, enumerate(time_ints)))
@@ -127,7 +128,6 @@ def main():
         elif pkl_exists:
             df = pd.read_pickle(out_pkl)
             idx_arr = df.index.values
-        # skipping freqs and tints that are already in the dataframe
         done = [(cmap_f[f], cmap_t[t]) for (f, t) in idx_arr if (f in freq_chans \
         and t in time_ints)]
         iter_dims = [idim for idim in iter_dims if idim not in done]
