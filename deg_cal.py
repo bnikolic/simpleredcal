@@ -68,7 +68,7 @@ def main():
     parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
                         type=str, help='Directory in which relative calibration \
                         results dataframes are located')
-    parser.add_argument('-n', '--new_csv', required=False, action='store_true', \
+    parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
 
@@ -92,7 +92,7 @@ def main():
     csv_exists = os.path.exists(out_csv)
     pkl_exists = os.path.exists(out_pkl)
     if csv_exists or pkl_exists:
-        if args.new_csv:
+        if args.new_df:
             out_csv = new_fn(out_csv, None, startTime)
             out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
             csv_exists = False
