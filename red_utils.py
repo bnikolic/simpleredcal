@@ -73,10 +73,10 @@ def find_flag_file(JD_time, cal_type):
 
 def find_rel_df(JD_time, pol, dist, dir=None):
     """Returns relative calibration results dataframe path for the specified
-    JD_time
+    JD time, polarization and fitting distribution
 
     :param JD_time: Fractional Julian date
-    :type JD_time: str
+    :type JD_time: float
     :param pol: Polarization of data
     :type pol: str
     :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
@@ -92,13 +92,50 @@ def find_rel_df(JD_time, pol, dist, dir=None):
         dir_path = dir
     df_path = '{}/rel_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, dist)
     if not os.path.exists(df_path):
-        df_glob = glob.glob('{}/rel_df.{}.{}.{}.*.pkl'.format(dir_path, \
-                            JD_time, pol, dist))
+        df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
             raise ValueError('DataFrame {} not found'.format(df_path))
         else:
-            df_glob.sort(reverse=True) # get latest result as default
-            df_path = df_glob[0]
+            df_glob.sort(reverse=True)
+            df_path = df_glob[0] # get latest result as default
+    return df_path
+
+
+def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
+    """Returns degenerate fitting results dataframe path for the specified
+    JD time, polarization, degenerate dimension and fitting distribution
+
+    :param JD_time: Fractional Julian date
+    :type JD_time: float
+    :param pol: Polarization of data
+    :type pol: str
+    :param deg_dim: Dimension to compare relatively calibrated visibility
+    solutions {"tint", "freq", "jd"}. If "jd" specified, add JD day of 2nd
+    dataset being compared, otherwise the next JD day will be assumed - e.g.
+    jd.2458099
+    :type deg_dim: str
+    :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
+    :type dist: str
+    :param dir: Directory in which dataframes are located
+    :type dir: str
+
+    :return: File path of degenerate fitting results dataframe
+    :rtype: str
+    """
+    dir_path = '.'
+    if dir is not None:
+        dir_path = dir
+    if deg_dim == 'jd':
+        deg_dim = 'jd.{}'.format(int(JD_time) + 1)
+    df_path = '{}/deg_df.{}.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, deg_dim, \
+                                              dist)
+    if not os.path.exists(df_path):
+        df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
+        if not df_glob:
+            raise ValueError('DataFrame {} not found'.format(df_path))
+        else:
+            df_glob.sort(reverse=True)
+            df_path = df_glob[0] # get latest result as default
     return df_path
 
 
