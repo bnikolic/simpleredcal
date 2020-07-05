@@ -20,6 +20,8 @@ def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     :type redg: ndarray
     :param vis_type: Plot either visibility amplitude or phase {'amp', 'phase'}
     :type vis_type: str
+    :param figsize: Figure size of plot
+    :type figsize: tuple
     """
     vis_calc = {'amp':numpy.abs, 'phase': numpy.angle}
     bl_id_seperations = numpy.unique(redg[:, 0], return_index=True)[1][1:]
@@ -74,34 +76,64 @@ def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots
 ylab_dict = {'nit': 'number of iterations', 'fun': 'log-likelihood'}
 
 
-def plot_res(df, ycol, logy=False, ylim=None, figsize=(12,8)):
+def clip_ylimtop(df, col, clip_pctile):
+    """Determine the top ylimit, with clipping applied, to better plot the
+    selected column in a dataframe
+
+    :param df: Results dataframe
+    :type df: DataFrame
+    :param col: Column to plot
+    :type col: str
+    :param clip_pctile: Percentile to clip the data
+    :type clip_pctile: int, float
+    """
+    if col == 'nit':
+        ylimtop = numpy.ceil(numpy.nanpercentile(df[col].values, clip_pctile))
+    else:
+        rnd_base = 10**-numpy.floor(numpy.log10(numpy.median(df[col].values)))
+        ylimtop = numpy.ceil(numpy.nanpercentile(df[col].values, \
+                             clip_pctile)*rnd_base)/rnd_base
+    return ylimtop
+
+
+def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
+             figsize=(12,8)):
     """Plot attribute of calibration results
 
     :param df: Results dataframe
     :type df: DataFrame
-    :param ycol: Attribute to plot
-    :type ycol: str
+    :param col: Attribute to plot
+    :type col: str
     :param logy: Bool to make y-axis scale logarithmic
     :type logy: bool
+    :param clip: Whether to clip the data shown in the plot, according to
+    clip_pctile, to better show the data
+    :type clip: bool
+    :param clip_pctile: Percentile to clip the data
+    :type clip_pctile: int, float
+    :param ylim: Set the bottom and dtop ylimits
+    :type ylim: int, float, None
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
-    ax = df[ycol].plot(figsize=figsize, ylim=ylim)
+    ax = df[col].plot(figsize=figsize, ylim=ylim)
+    if clip:
+        ax.set_ylim(bottom=0, top=clip_ylimtop(df, col, clip_pctile))
     ylog = ''
     if logy:
         ax.set_yscale('log')
         ylog = 'Log '
-    ax.set_ylabel((ylog+ylab_dict[ycol]).capitalize())
+    ax.set_ylabel((ylog+ylab_dict[col]).capitalize())
     plt.show()
 
 
-def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
+def plot_res_grouped(df, col, group_by='success', logy=False, figsize=(12,8)):
     """Plot attribute of calibration results, grouped by another attribute
 
     :param df: Results dataframe
     :type df: DataFrame
-    :param ycol: Attribute to plot
-    :type ycol: str
+    :param col: Attribute to plot
+    :type col: str
     :param group_by: Column by which to group scatter points
     :type group_by: str
     :param logy: Bool to make y-axis scale logarithmic
@@ -110,12 +142,10 @@ def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
     :type figsize: tuple
     """
     idx_dict = {k:i for i, k in enumerate(df.index.values)}
-
-    x1 = [idx_dict[i] for i in df[df[group_by]][ycol].index.values]
-    y1 = df[df[group_by]][ycol].values
-
-    x2 = [idx_dict[i] for i in df[~df[group_by]][ycol].index.values]
-    y2 = df[~df[group_by]][ycol].values
+    x1 = [idx_dict[i] for i in df[df[group_by]][col].index.values]
+    x2 = [idx_dict[i] for i in df[~df[group_by]][col].index.values]
+    y1 = df[df[group_by]][col].values
+    y2 = df[~df[group_by]][col].values
 
     fig, ax = plt.subplots(figsize=figsize)
     ax.scatter(x1, y1, s=4, alpha=0.5, label=group_by)
@@ -124,24 +154,22 @@ def plot_res_grouped(df, ycol, group_by='success', logy=False, figsize=(12,8)):
     if logy:
         ax.set_yscale('log')
         ylog = 'Log '
-    ax.set_ylabel((ylog+ylab_dict[ycol]).capitalize())
+    ax.set_ylabel((ylog+ylab_dict[col]).capitalize())
     plt.legend()
     plt.show()
 
     if (~df['success']).any():
-        pgbmax = round(numpy.max(df[ycol][~df['success']].values), 3)
+        pgbmax = round(numpy.max(df[col][~df['success']].values), 3)
     else:
         pgbmax = 'n/a - all minimizations were succesful'
-
-    print('Max {} for minimizations with {}=False: {}\n'.format(ylab_dict[ycol], \
+    print('Max {} for minimizations with {}=False: {}\n'.format(ylab_dict[col], \
           group_by, pgbmax))
+    print('Max {} for minimizations with {}=True: {}'.format(ylab_dict[col], \
+          group_by, round(numpy.max(df[col][df['success']].values), 3)))
 
-    print('Max {} for minimizations with {}=True: {}'.format(ylab_dict[ycol], \
-          group_by, round(numpy.max(df[ycol][df['success']].values), 3)))
 
-
-def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
-                     figsize=(11,7)):
+def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
+                     clip_pctile=99, vmax=None, figsize=(11,7)):
     """Plot heatmap of results of redundant calibration
 
     :param df: Results dataframe
@@ -152,6 +180,11 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
     :type index: str
     :param columns: Columns of pivoted dataframe
     :type columns: str
+    :param clip: Whether to clip the data shown in the plot, according to
+    clip_pctile, to better show the data
+    :type clip: bool
+    :param clip_pctile: Percentile to clip the data
+    :type clip_pctile: int, float
     :param vmax: Maximum value of heatmap
     :type vmax: float
     :param figsize: Figure size of plot
@@ -159,6 +192,8 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
     """
     piv = pd.pivot_table(df, values=value, index=index, columns=columns)
     fig, ax = plt.subplots(figsize=figsize)
+    if clip:
+        vmax=clip_ylimtop(df, value, clip_pctile)
     ax = sns.heatmap(piv, vmax=vmax, cmap=sns.cm.rocket_r)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-50))
@@ -169,7 +204,7 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', vmax=None, \
 
 
 def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
-                    xbase=50, ybase=5, cmap=None, center=None, figsize=(14, 7)):
+                    xbase=50, ybase=5, cmap=None, center=None, figsize=(14,7)):
     """Plots heatmap of visibility-related data, with vmax set as a percentile
     of the dataframe
 
