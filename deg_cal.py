@@ -196,6 +196,12 @@ def main():
     no_deg_params = 3 # overall amplitude, x phase gradient, y phase gradient
     header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
 
+    if not iter_dims:
+        raise ValueError('No frequency channels or time integrations to '\
+                         'iterate over - check that the specified --chans '\
+                         'and --tints exist in the relative calibration '\
+                         'results dataframes')
+
     skip_cal = False
     # skipping freqs and tints that are already in dataframe
     if csv_exists or pkl_exists:
@@ -211,12 +217,6 @@ def main():
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_pkl))
             skip_cal = True
-
-    if not iter_dims:
-        raise ValueError('No frequency channels or time integrations to '\
-                         'iterate over - check that the specified --chans '\
-                         'and --tints exist in the relative calibration '\
-                         'results dataframes')
 
     if not skip_cal:
         stdout = io.StringIO()
