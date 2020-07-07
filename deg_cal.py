@@ -191,11 +191,6 @@ def main():
     else:
         rel_df_c = rel_df
 
-    # removing 'jac', 'hess_inv', 'nfev', 'njev'
-    slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
-    no_deg_params = 3 # overall amplitude, x phase gradient, y phase gradient
-    header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
-
     if not iter_dims:
         raise ValueError('No frequency channels or time integrations to '\
                          'iterate over - check that the specified --chans '\
@@ -219,6 +214,11 @@ def main():
             skip_cal = True
 
     if not skip_cal:
+        # removing 'jac', 'hess_inv', 'nfev', 'njev'
+        slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
+        no_deg_params = 3 # overall amplitude, x phase gradient, y phase gradient
+        header = slct_keys[:-1] + list(numpy.arange(no_deg_params)) + indices
+
         stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
             with open(out_csv, 'a') as f: # write / append to csv file
