@@ -196,7 +196,6 @@ def main():
                     writer.writerow(res_rel)
 
         print('Relative calibration results saved to csv file {}'.format(out_csv))
-
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         df.sort_values(by=indices, inplace=True)
