@@ -232,9 +232,17 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     matplotlib.pyplot.subplots
     :rtype: tuple
     """
+
+    vmin = None
+    if (arr < 0).any():
+        clip_pctile_b = (100 - clip_pctile)/2
+        clip_pctile = clip_pctile - clip_pctile_b
+        vmin = numpy.floor(numpy.nanpercentile(arr, clip_pctile_b)*100)/100
+
+    vmax = numpy.ceil(numpy.nanpercentile(arr, clip_pctile)*100)/100
+
     fig, ax = plt.subplots(figsize=figsize)
-    ax = sns.heatmap(arr, vmax=numpy.ceil(numpy.nanpercentile(arr, \
-                     clip_pctile)*100)/100, cmap=cmap, center=0)
+    ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=0)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
