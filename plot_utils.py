@@ -233,6 +233,7 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     :rtype: tuple
     """
 
+    # clip on both the bottom and top ends of the array
     vmin = None
     if (arr < 0).any():
         clip_pctile_b = (100 - clip_pctile)/2
