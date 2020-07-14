@@ -201,8 +201,8 @@ def main():
                 for i, iter_dim in enumerate(iter_dims):
                     res_rel, initp = RelCal(cData[iter_dim], initp)
                     # expanding out the solution
-                    for i, param in enumerate(res_rel['x']):
-                        res_rel[i] = param
+                    for j, param in enumerate(res_rel['x']):
+                        res_rel[j] = param
                     # reset initp after each frequency slice
                     if not i%no_tints:
                         initp = None
