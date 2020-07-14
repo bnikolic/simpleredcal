@@ -130,29 +130,32 @@ def main():
     time_ints = rel_df.index.get_level_values('time_int').unique().values
 
     indices = ['freq', 'time_int']
-
     no_tints = len(time_ints)
     iter_dims = list(numpy.ndindex((len(freq_chans), no_tints)))
+
+    if not iter_dims:
+        raise ValueError('No frequency channels or time integrations to '\
+            'iterate over - check that the specified --chans and --tints exist '\
+            'in the relative calibration results dataframes')
+
     skip_cal = False
     # skipping freqs and tints that are already in dataframe
     if csv_exists or pkl_exists:
+        cmap_f = dict(map(reversed, enumerate(freq_chans)))
+        cmap_t = dict(map(reversed, enumerate(time_ints)))
         if csv_exists:
             df = pd.read_csv(out_csv, usecols=indices)
             idx_arr = df.values
         elif pkl_exists:
             df = pd.read_pickle(out_pkl)
             idx_arr = df.reset_index()[indices].values
-        iter_dims = [idim for idim in iter_dims if not \
-            numpy.equal(idx_arr, numpy.asarray(idim)).all(1).any()]
+        done = [(cmap_f[f], cmap_t[t]) for (f, t) in idx_arr if (f in freq_chans \
+        and t in time_ints)]
+        iter_dims = [idim for idim in iter_dims if idim not in done]
         if not any(iter_dims):
             print('Solutions to all specified frequency channels and time '\
                   'integrations already exist in {}\n'.format(out_pkl))
             skip_cal = True
-
-    if not iter_dims:
-        raise ValueError('No frequency channels or time integrations to '\
-            'iterate over - check that the specified --chans and --tints exist '\
-            'in the relative calibration results dataframes')
 
     if not skip_cal:
         hd, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
