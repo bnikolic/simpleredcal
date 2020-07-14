@@ -147,8 +147,8 @@ def main():
             df = pd.read_csv(out_csv, usecols=indices)
             idx_arr = df.values
         elif pkl_exists:
-            df = pd.read_pickle(out_pkl)
-            idx_arr = df.reset_index()[indices].values
+            df_pkl = pd.read_pickle(out_pkl)
+            idx_arr = df_pkl.reset_index()[indices].values
         done = [(cmap_f[f], cmap_t[t]) for (f, t) in idx_arr if (f in freq_chans \
         and t in time_ints)]
         iter_dims = [idim for idim in iter_dims if idim not in done]
@@ -227,6 +227,8 @@ def main():
               .format(out_csv))
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
+        if not csv_exists:
+            df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
         df.to_pickle(out_pkl)
         print('Absolute optimal calibration results dataframe pickled to {}'\

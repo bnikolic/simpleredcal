@@ -204,8 +204,8 @@ def main():
             df = pd.read_csv(out_csv, usecols=indices)
             idx_arr = df.values
         elif pkl_exists:
-            df = pd.read_pickle(out_pkl)
-            idx_arr = df.reset_index()[indices].values
+            df_pkl = pd.read_pickle(out_pkl)
+            idx_arr = df_pkl.reset_index()[indices].values
         iter_dims = [idim for idim in iter_dims if not \
             numpy.equal(idx_arr, numpy.asarray(idim)).all(1).any()]
         if not any(iter_dims):
@@ -254,13 +254,15 @@ def main():
         df_indices = indices.copy()
         mv_col = df_indices.pop(1)
         df.set_index(df_indices, inplace=True)
-        df.sort_values(by=indices, inplace=True)
         cols = list(df.columns.values)
         cols.remove(mv_col)
         df = df[[mv_col]+cols]
         # we now append the residuals as additional columns
-        # the dataframe is also saved to pickle file format at this stage
-        df = append_residuals_deg(df, rel_df, rel_df_c, md, out_fn=out_pkl)
+        df = append_residuals_deg(df, rel_df, rel_df_c, md, out_fn=None)
+        if not csv_exists:
+            df = pd.concat([df, df_pkl])
+        df.sort_values(by=indices, inplace=True)
+        df.to_pickle(out_pkl)
         print('Degenerate fitting results dataframe pickled to {}'.format(out_pkl))
 
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))

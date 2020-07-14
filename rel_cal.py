@@ -132,8 +132,8 @@ def main():
             df = pd.read_csv(out_csv, usecols=indices)
             idx_arr = df.values
         elif pkl_exists:
-            df = pd.read_pickle(out_pkl)
-            idx_arr = df.index.values
+            df_pkl = pd.read_pickle(out_pkl)
+            idx_arr = df_pkl.index.values
         done = [(cmap_f[f], cmap_t[t]) for (f, t) in idx_arr if (f in freq_chans \
         and t in time_ints)]
         iter_dims = [idim for idim in iter_dims if idim not in done]
@@ -247,10 +247,12 @@ def main():
         print('Relative calibration results saved to csv file {}'.format(out_csv))
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
-        df.sort_values(by=indices, inplace=True)
         # we now append the residuals as additional columns
-        # the dataframe is also saved to pickle file format at this stage
-        df = append_residuals_rel(df, cData, RedG, out_fn=out_pkl)
+        df = append_residuals_rel(df, cData, RedG, out_fn=None)
+        if not csv_exists:
+            df = pd.concat([df, df_pkl])
+        df.sort_values(by=indices, inplace=True)
+        df.to_pickle(out_pkl)
         print('Relative calibration results dataframe pickled to {}'.format(out_pkl))
 
         # creating metadata file
