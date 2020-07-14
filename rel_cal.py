@@ -14,6 +14,7 @@ visibility dataset
 
 import argparse
 import datetime
+import functools
 import io
 import os
 import pickle
@@ -64,6 +65,9 @@ def main():
     parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
+    parser.add_argument('-r', '--rp', required=False, action='store_true', \
+                        help='Reduced number of parameters method, using polar \
+                        coordinates - doRelCal vs doRelCalRP')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new dataframe')
     args = parser.parse_args()
@@ -160,6 +164,33 @@ def main():
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
+        def cal(redg, dist, obsvis, initp):
+            """Using doRelCal - fastest solver"""
+            res_rel = doRelCal(redg, obsvis, \
+                               distribution=dist, initp=initp)
+            res_rel = {key:res_rel[key] for key in slct_keys}
+            res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
+            # use solution for next solve in iteration
+            if res_rel['success']:
+                initp = res_rel['x']
+            return res_rel, initp
+
+        def cal_RP(redg, dist, obsvis, initp):
+            """Using doRelCalRP - reduced number of parameters, in polar coords"""
+            res_rel, initp_ = doRelCalRP(redg, obsvis, \
+                                         distribution=dist, initp=initp)
+            res_rel = {key:res_rel[key] for key in slct_keys}
+            # use solution for next solve in iteration
+            if res_rel['success']:
+                initp = initp_
+            return res_rel, initp
+
+        if args.rp:
+            Cal_f = cal_RP
+        else:
+            Cal_f = cal
+        RelCal = functools.partial(Cal_f, RedG, args.dist)
+
         stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
             with open(out_csv, 'a') as f: # write / append to csv file
@@ -168,22 +199,7 @@ def main():
                     writer.writeheader()
                 initp = None
                 for i, iter_dim in enumerate(iter_dims):
-                    # res_rel = doRelCal(RedG, cData[iter_dim], \
-                    #                    distribution=args.dist, initp=initp)
-                    # res_rel = {key:res_rel[key] for key in slct_keys}
-                    # res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
-                    # # use solution for next solve in iteration
-                    # if res_rel['success']:
-                    #     initp = res_rel['x'] # initp_ = initp
-
-                    # using doRelCalRP (reduced number of paramters, in polar coords)
-                    res_rel, initp_ = doRelCalRP(RedG, cData[iter_dim], \
-                                                 distribution=args.dist, initp=initp)
-                    res_rel = {key:res_rel[key] for key in slct_keys}
-                    # use solution for next solve in iteration
-                    if res_rel['success']:
-                        initp = initp_
-
+                    res_rel, initp = RelCal(cData[iter_dim], initp)
                     # expanding out the solution
                     for i, param in enumerate(res_rel['x']):
                         res_rel[i] = param
