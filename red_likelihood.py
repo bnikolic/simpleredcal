@@ -423,9 +423,9 @@ def set_gref(gain_comps, ref_ant_idx):
     # set reference gain constraints
     gampref = 1/gamps.sum() # constraint that the product of amps is 1
     # Do not set a constraint for the average phase at this point
-    # gphaseref = -gphases.sum() # constraint that the mean phase is 0
+    gphaseref = -gphases.sum() # constraint that the mean phase is 0
     # gphaseref = -circmean(gphases)
-    gphaseref = 0 # set the phase of the reference antenna to be 0 instead
+    # gphaseref = 0 # set the phase of the reference antenna to be 0 instead
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, gphaseref, gphase2])
     gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
