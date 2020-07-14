@@ -165,7 +165,23 @@ def main():
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
         def cal(redg, dist, obsvis, initp):
-            """Using doRelCal - fastest solver"""
+            """Relative redundant calibration with doRelCal: unconstrained
+            minimizer using cartesian coordinates - this is the fastest solver
+
+            :param redg: Grouped baselines, as returned by groupBls
+            :type redg: ndarray
+            :param dist: Distribution to fit likelihood {'gaussian', 'cauchy'}
+            :type dist: str
+            :param obsvis: Observed sky visibilities for a given frequency and given time,
+            reformatted to have format consistent with redg
+            :type obsvis: ndarray
+            :param initp: Initial parameter guesses for true visibilities and gains
+            :type initp: ndarray, None
+
+            :return: Optimization result for the solved antenna gains and true sky
+            visibilities
+            :rtype: Scipy optimization result object
+            """
             res_rel = doRelCal(redg, obsvis, \
                                distribution=dist, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
@@ -176,7 +192,24 @@ def main():
             return res_rel, initp
 
         def cal_RP(redg, dist, obsvis, initp):
-            """Using doRelCalRP - reduced number of parameters, in polar coords"""
+            """Relative redundant calibration with doRelCalRP: constrained
+            minimizer (by reducing the number of parameters) using polar
+            coordinates
+
+            :param redg: Grouped baselines, as returned by groupBls
+            :type redg: ndarray
+            :param dist: Distribution to fit likelihood {'gaussian', 'cauchy'}
+            :type dist: str
+            :param obsvis: Observed sky visibilities for a given frequency and given time,
+            reformatted to have format consistent with redg
+            :type obsvis: ndarray
+            :param initp: Initial parameter guesses for true visibilities and gains
+            :type initp: ndarray, None
+
+            :return: Optimization result for the solved antenna gains and true sky
+            visibilities
+            :rtype: Scipy optimization result object
+            """
             res_rel, initp_ = doRelCalRP(redg, obsvis, \
                                          distribution=dist, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}

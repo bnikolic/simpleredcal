@@ -174,7 +174,19 @@ def main():
 
         ant_sep = red_ant_sep(RedG, hd.antpos)
         def get_w_alpha(res_rel_vis, new_deg_params):
-            """ """
+            """Apply degenerate parameters found from optimal absolute
+            calibration to visibility solutions from relative redundant
+            calibration
+
+            :param res_rel_vis: Visibility solutions
+            :type res_rel_vis: ndarray
+            :param new_deg_params: Degenerate parameters
+            optimal calibration
+            :type new_deg_params: ndarray
+
+            :return: Degenerately transformed visibility solutions
+            :rtype: ndarray
+            """
             return degVis(ant_sep, res_rel_vis, *new_deg_params[[0, 2, 3]])
 
         stdout = io.StringIO()
