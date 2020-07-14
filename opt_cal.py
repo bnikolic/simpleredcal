@@ -28,6 +28,7 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
+from fit_diagnostics import append_residuals_opt
 from red_likelihood import decomposeCArray, degVis, doOptCal, group_data, \
 red_ant_sep
 from red_utils import find_nearest, find_flag_file, find_rel_df, find_zen_file, \
@@ -227,6 +228,7 @@ def main():
               .format(out_csv))
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
+        df = append_residuals_opt(df, cData, RedG, out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)

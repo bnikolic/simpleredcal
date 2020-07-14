@@ -4,7 +4,8 @@
 import numpy
 import pandas as pd
 
-from red_likelihood import degVis, group_data, gVis, red_ant_sep, relabelAnts
+from red_likelihood import degVis, group_data, gVis, makeCArray, makeEArray, \
+red_ant_sep, relabelAnts
 from red_utils import find_flag_file, find_zen_file, get_bad_ants, \
 split_rel_results
 
@@ -170,3 +171,71 @@ def append_residuals_deg(deg_df, rel_df1, rel_df2, md, out_fn=None):
             deg_df.to_pickle(out_fn)
 
     return deg_df
+
+
+def append_residuals_opt(opt_df, cdata, redg, out_fn=None):
+    """Calculates the residuals and normalized residuals for the absolute
+    optimal calibration fitting, for each frequency and time integration slice,
+    and appends the residual results to the existing relative calibration results
+    dataframe.
+
+    :param opt_df: Absolute optimal calibration results dataframe
+    :type opt_df: DataFrame
+    :param cdata: Grouped visibilities with flags in numpy MaskedArray format,
+    with format consistent with redg and dimensions (freq chans,
+    time integrations, baselines)
+    :type cdata: MaskedArray
+    :param redg: Grouped baselines, as returned by groupBls
+    :type redg: ndarray
+    :param out_fn: Output dataframe file name. If None, file not pickled.
+    :type out_fn: str, None
+
+    :return: Absolute optimal calibration results dataframe, with residual
+    columns appended
+    :rtype: DataFrame
+    """
+    residual_cols = ['residual', 'norm_residual']
+    if set(residual_cols).issubset(opt_df.columns.values):
+        print('Residuals already appended to dataframe - exiting')
+    else:
+        print('Appending residuals to dataframe')
+        no_unq_bls = numpy.unique(redg[:, 0]).size
+        idxs = list(opt_df.index.names)
+        opt_df.reset_index(inplace=True)
+        freqs = opt_df['freq'].unique()
+        tints = opt_df['time_int'].unique()
+
+        no_ants = numpy.unique(redg[:, 1:]).size
+        credg = relabelAnts(redg)
+        def calc_opt_residuals(row):
+            """Calculate residual and normalized residual to append to absolute
+            optimal calibration results dataframe
+
+            :param row: Row of the relative calibration results dataframe
+            :type row: Series
+
+            :return: Residual columns to append to dataframe
+            :rtype: Series
+            """
+            cidx = len([col for col in opt_df.columns.values if not col.isdigit()])
+            cmap_f = dict(map(reversed, enumerate(freqs)))
+            cmap_t = dict(map(reversed, enumerate(tints)))
+            opt_resx = row.values[cidx:].astype(float)
+            new_gain_comps = opt_resx[:2*no_ants]
+            new_gains = makeEArray(new_gain_comps)
+            w_alpha_comps = opt_resx[-no_unq_bls*2:]
+            w_alpha = makeCArray(w_alpha_comps)
+            obs_vis = cdata[cmap_f[row['freq']], cmap_t[row['time_int']], :]
+            pred_opt_vis = gVis(w_alpha, credg, new_gains)
+            opt_residuals = obs_vis - pred_opt_vis
+            norm_opt_residuals = norm_residuals(obs_vis, pred_opt_vis)
+            return pd.Series([opt_residuals, norm_opt_residuals])
+
+        opt_df[residual_cols] = opt_df.apply(lambda row: calc_opt_residuals(row), \
+                                             axis=1)
+        opt_df.set_index(idxs, inplace=True)
+
+        if out_fn is not None:
+            opt_df.to_pickle(out_fn)
+
+    return opt_df
