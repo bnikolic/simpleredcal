@@ -227,7 +227,7 @@ def main():
               .format(out_csv))
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
-        if not csv_exists:
+        if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
         df.to_pickle(out_pkl)

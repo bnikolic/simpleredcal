@@ -249,7 +249,7 @@ def main():
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
         df = append_residuals_rel(df, cData, RedG, out_fn=None)
-        if not csv_exists:
+        if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
         df.to_pickle(out_pkl)

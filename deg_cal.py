@@ -259,7 +259,7 @@ def main():
         df = df[[mv_col]+cols]
         # we now append the residuals as additional columns
         df = append_residuals_deg(df, rel_df, rel_df_c, md, out_fn=None)
-        if not csv_exists:
+        if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
         df.to_pickle(out_pkl)
