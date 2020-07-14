@@ -28,7 +28,8 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
-from red_likelihood import doOptCal, group_data
+from red_likelihood import decomposeCArray, degVis, doOptCal, group_data, \
+red_ant_sep
 from red_utils import find_nearest, find_flag_file, find_rel_df, find_zen_file, \
 fn_format, get_bad_ants, mod_str_arg, new_fn, split_rel_results
 
@@ -110,7 +111,7 @@ def main():
     ptints = args.tints
     if ptints is None:
         ptints = '0~{}'.format(md['Ntimes']-1)
-    print('Running absolute optimal calibrationfor visibility dataset {} '\
+    print('Running absolute optimal calibration for visibility dataset {} '\
           'for frequency channel(s) {} and time integration(s) {}\n'.\
           format(os.path.basename(zen_fn), pchans, ptints))
 
@@ -165,8 +166,13 @@ def main():
         # removing 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
         no_deg_params = 4 # overall amplitude, overall phase, x & y phase gradients
-        psize = no_ants*2 + no_deg_params
+        psize = no_ants*2 + no_deg_params + no_unq_bls*2
         header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
+
+        ant_sep = red_ant_sep(RedG, hd.antpos)
+        def get_w_alpha(res_rel_vis, new_deg_params):
+            """ """
+            return degVis(ant_sep, res_rel_vis, *new_deg_params[[0, 2, 3]])
 
         stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
@@ -184,9 +190,13 @@ def main():
                         res_rel_vis, distribution=args.dist, ref_ant=args.ref_ant, \
                         initp=initp)
                     res_opt = {key:res_opt[key] for key in slct_keys}
+                    # get the new visibility solutions
+                    w_alpha = get_w_alpha(res_rel_vis, res_opt['x'][-no_deg_params:])
+                    w_alpha_comps = decomposeCArray(w_alpha)
+                    all_params = numpy.append(res_opt['x'], w_alpha_comps)
                     # expanding out the solution
-                    for i, param in enumerate(res_opt['x']):
-                        res_opt[i] = param
+                    for j, param in enumerate(all_params):
+                        res_opt[j] = param
                     # to use solution for next solve in iteration
                     if res_opt['success']:
                         initp = res_opt['x']
