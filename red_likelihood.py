@@ -400,6 +400,7 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
     return res
 
 
+from scipy.stats import circmean
 def set_gref(gain_comps, ref_ant_idx):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1 and the mean of all gain
@@ -420,8 +421,11 @@ def set_gref(gain_comps, ref_ant_idx):
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
     # set reference gain constraints
-    gampref = 1/gamps.prod() # constraint that the product of amps is 1
-    gphaseref = -gphases.sum() # constraint that the mean phase is 0
+    gampref = 1/gamps.sum() # constraint that the product of amps is 1
+    # Do not set a constraint for the average phase at this point
+    # gphaseref = -gphases.sum() # constraint that the mean phase is 0
+    # gphaseref = -circmean(gphases)
+    gphaseref = 0 # set the phase of the reference antenna to be 0 instead
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, gphaseref, gphase2])
     gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
@@ -468,7 +472,7 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
     return log_likelihood
 
 
-def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=85, initp=None, \
+def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
                max_nit=1000):
     """Do relative step of redundant calibration
 
@@ -626,7 +630,7 @@ class Opt_Constraints:
     def avg_phase(self, params):
         """Constraint that mean of gain phases must be equal to 0
 
-        :return: Residual between circular mean of gain phases and 0
+        :return: Residual between mean of gain phases and 0
         :rtype: float
         """
         phases = params[1:self.ants.size*2:2]
