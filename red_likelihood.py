@@ -7,6 +7,7 @@ import functools
 import numpy
 from matplotlib import pyplot as plt
 from scipy.optimize import Bounds, minimize
+from scipy.stats import circmean
 
 import hera_cal
 from hera_cal.io import HERACal, HERAData
@@ -400,7 +401,6 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
     return res
 
 
-from scipy.stats import circmean
 def set_gref(gain_comps, ref_ant_idx):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1 and the mean of all gain
@@ -421,11 +421,11 @@ def set_gref(gain_comps, ref_ant_idx):
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
     # set reference gain constraints
-    gampref = 1/gamps.sum() # constraint that the product of amps is 1
-    # Do not set a constraint for the average phase at this point
+    gampref = 1/gamps.prod() # constraint that the product of amps is 1
+    # gampref = 1 + gamps.size - gamps.sum() # constraint that the sum of amps is 1
     gphaseref = -gphases.sum() # constraint that the mean phase is 0
-    # gphaseref = -circmean(gphases)
-    # gphaseref = 0 # set the phase of the reference antenna to be 0 instead
+    # gphaseref = -circmean(gphases) # constraint that the circular mean phase is 0
+    # gphaseref = 0 # set the phase of the reference antenna to be 0
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, gphaseref, gphase2])
     gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
