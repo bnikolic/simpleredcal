@@ -5,7 +5,7 @@ import numpy
 import pandas as pd
 
 from red_likelihood import degVis, group_data, gVis, makeCArray, makeEArray, \
-red_ant_sep, relabelAnts
+red_ant_sep
 from red_utils import find_flag_file, find_zen_file, get_bad_ants, \
 split_rel_results
 
@@ -38,7 +38,7 @@ def abs_residuals(residuals):
             for i in ('real', 'imag')]
 
 
-def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
+def append_residuals_rel(rel_df, cdata, credg, out_fn=None):
     """Calculates the residuals and normalized residuals for the relative redundant
     calibration fitting, for each frequency and time integration slice, and
     appends the residual results to the existing relative calibration results
@@ -50,8 +50,9 @@ def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
     with format consistent with redg and dimensions (freq chans,
     time integrations, baselines)
     :type cdata: MaskedArray
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param out_fn: Output dataframe file name. If None, file not pickled.
     :type out_fn: str, None
 
@@ -63,7 +64,7 @@ def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
         print('Residuals already appended to dataframe - exiting')
     else:
         print('Appending residuals to dataframe')
-        no_unq_bls = numpy.unique(redg[:, 0]).size
+        no_unq_bls = credg[:, 0].max() + 1
         idxs = list(rel_df.index.names)
         rel_df.reset_index(inplace=True)
         freqs = rel_df['freq'].unique()
@@ -85,7 +86,7 @@ def append_residuals_rel(rel_df, cdata, redg, out_fn=None):
             resx = row.values[cidx:].astype(float)
             res_rel_vis, res_rel_gains = split_rel_results(resx, no_unq_bls)
             obs_vis = cdata[cmap_f[row['freq']], cmap_t[row['time_int']], :]
-            pred_rel_vis = gVis(res_rel_vis, relabelAnts(redg), res_rel_gains)
+            pred_rel_vis = gVis(res_rel_vis, credg, res_rel_gains)
             rel_residuals = obs_vis - pred_rel_vis
             norm_rel_residuals = norm_residuals(obs_vis, pred_rel_vis)
             return pd.Series([rel_residuals, norm_rel_residuals])
@@ -173,7 +174,7 @@ def append_residuals_deg(deg_df, rel_df1, rel_df2, md, out_fn=None):
     return deg_df
 
 
-def append_residuals_opt(opt_df, cdata, redg, out_fn=None):
+def append_residuals_opt(opt_df, cdata, credg, out_fn=None):
     """Calculates the residuals and normalized residuals for the absolute
     optimal calibration fitting, for each frequency and time integration slice,
     and appends the residual results to the existing relative calibration results
@@ -185,8 +186,9 @@ def append_residuals_opt(opt_df, cdata, redg, out_fn=None):
     with format consistent with redg and dimensions (freq chans,
     time integrations, baselines)
     :type cdata: MaskedArray
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param out_fn: Output dataframe file name. If None, file not pickled.
     :type out_fn: str, None
 
@@ -199,14 +201,13 @@ def append_residuals_opt(opt_df, cdata, redg, out_fn=None):
         print('Residuals already appended to dataframe - exiting')
     else:
         print('Appending residuals to dataframe')
-        no_unq_bls = numpy.unique(redg[:, 0]).size
+        no_ants = credg[:, 1:].max() + 1
+        no_unq_bls = credg[:, 0].max() + 1
         idxs = list(opt_df.index.names)
         opt_df.reset_index(inplace=True)
         freqs = opt_df['freq'].unique()
         tints = opt_df['time_int'].unique()
 
-        no_ants = numpy.unique(redg[:, 1:]).size
-        credg = relabelAnts(redg)
         def calc_opt_residuals(row):
             """Calculate residual and normalized residual to append to absolute
             optimal calibration results dataframe

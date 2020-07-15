@@ -28,7 +28,8 @@ import numpy
 from hera_cal.io import HERAData
 
 from fit_diagnostics import append_residuals_rel
-from red_likelihood import doRelCal, doRelCalRP, group_data, norm_rel_sols
+from red_likelihood import doRelCal, doRelCalRP, group_data, norm_rel_sols, \
+relabelAnts
 from red_utils import find_flag_file, find_zen_file, fn_format, get_bad_ants, \
 mod_str_arg, new_fn
 
@@ -248,7 +249,7 @@ def main():
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
-        df = append_residuals_rel(df, cData, RedG, out_fn=None)
+        df = append_residuals_rel(df, cData, relabelAnts(RedG), out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)

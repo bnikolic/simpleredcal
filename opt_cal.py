@@ -30,7 +30,7 @@ import numpy
 
 from fit_diagnostics import append_residuals_opt
 from red_likelihood import decomposeCArray, degVis, doOptCal, group_data, \
-red_ant_sep
+red_ant_sep, relabelAnts
 from red_utils import find_nearest, find_flag_file, find_rel_df, find_zen_file, \
 fn_format, get_bad_ants, mod_str_arg, new_fn, split_rel_results
 
@@ -228,7 +228,7 @@ def main():
               .format(out_csv))
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
-        df = append_residuals_opt(df, cData, RedG, out_fn=None)
+        df = append_residuals_opt(df, cData, relabelAnts(RedG), out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
