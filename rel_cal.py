@@ -238,7 +238,7 @@ def main():
                     for j, param in enumerate(res_rel['x']):
                         res_rel[j] = param
                     # reset initp after each frequency slice
-                    if not i%no_tints:
+                    if not (i+1)%no_tints:
                         initp = None
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \

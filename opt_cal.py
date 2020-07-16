@@ -217,7 +217,7 @@ def main():
                     if res_opt['success']:
                         initp = res_opt['x']
                     # reset initp after each frequency slice
-                    if not i%no_tints:
+                    if not (i+1)%no_tints:
                         initp = None
                     del res_opt['x']
                     res_opt.update({indices[0]:rel_idim[0], \
