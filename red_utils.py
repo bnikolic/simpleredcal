@@ -139,6 +139,36 @@ def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
     return df_path
 
 
+def find_opt_df(JD_time, pol, dist, dir=None):
+    """Returns optimal calibration results dataframe path for the specified
+    JD time, polarization and fitting distribution
+
+    :param JD_time: Fractional Julian date
+    :type JD_time: float
+    :param pol: Polarization of data
+    :type pol: str
+    :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
+    :type dist: str
+    :param dir: Directory in which dataframes are located
+    :type dir: str
+
+    :return: File path of relative calibration results dataframe
+    :rtype: str
+    """
+    dir_path = '.'
+    if dir is not None:
+        dir_path = dir
+    df_path = '{}/opt_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, dist)
+    if not os.path.exists(df_path):
+        df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
+        if not df_glob:
+            raise ValueError('DataFrame {} not found'.format(df_path))
+        else:
+            df_glob.sort(reverse=True)
+            df_path = df_glob[0] # get latest result as default
+    return df_path
+
+
 def fn_format(fn, format):
     """Format file name to have correct file extension
 
