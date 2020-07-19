@@ -97,7 +97,7 @@ def clip_ylimtop(df, col, clip_pctile):
 
 
 def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
-             figsize=(12,8)):
+             ylabel='', figsize=(12,8)):
     """Plot attribute of calibration results
 
     :param df: Results dataframe
@@ -113,6 +113,8 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
     :type clip_pctile: int, float
     :param ylim: Set the bottom and dtop ylimits
     :type ylim: int, float, None
+    :param ylabel: ylabel of the plot
+    :type ylabel: str
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -123,7 +125,9 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
     if logy:
         ax.set_yscale('log')
         ylog = 'Log '
-    ax.set_ylabel((ylog+ylab_dict[col]).capitalize())
+    if col in ylab_dict.keys():
+        ylabel = ylab_dict[col]
+    ax.set_ylabel((ylog+ylabel).capitalize())
     plt.show()
 
 
