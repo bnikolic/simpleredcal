@@ -202,6 +202,24 @@ def get_bad_ants(zen_path):
     return bad_ants_dict[jd_day]
 
 
+def flt_ant_coords(jd_time, antcoords):
+    """Sort antenna coordinates according to antenna number and filter out bad
+    antennas
+
+    :param JD_time: Fractional Julian date associated with antcoords
+    :type JD_time: float
+    :param antcoords: Antenna coordinates (e.g. position, separation etc.)
+    :type antcoords: dict
+
+    :return: Sorted and filtered antenna coordinates
+    :rtype: dict
+    """
+    bad_ants = get_bad_ants(find_zen_file(jd_time))
+    antcoords = {ant_no: coord for ant_no, coord in sorted(antcoords.items(), \
+                key=lambda item: item[0]) if ant_no not in bad_ants}
+    return antcoords
+
+
 def find_nearest(arr, val, condition=None):
     """Find nearest value in array and its index
 

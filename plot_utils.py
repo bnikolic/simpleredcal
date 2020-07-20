@@ -275,3 +275,42 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     return fig, ax
+
+
+def antpos_map(values, antpos, title=None, std_rng=2, center=0, figsize=(10, 8)):
+    """Scatter plot of values attributed to antennas, according to their
+    physical positions
+
+    :param values: Values to determine colour of antenna scatter points
+    :type values: ndarray
+    :param values: Filtered (bad ants removed) antenna positions
+    :type values: dict
+    :param values: Title of plot
+    :type values: str, None
+    :param std_rng: Number of standard deviations for the values to set the vmin
+    and vmax of the colourmap
+    :type std_rng: int, float
+    :param center: Value at which to center the colourmap
+    :type center: float
+    :param figsize: Figure size of plot
+    :type figsize: tuple
+    """
+    fig, ax = plt.subplots(figsize=(10, 8))
+    vrng = numpy.ceil(numpy.std(values)*std_rng*10)/10
+    im = ax.scatter(numpy.array(list(antpos.values()))[:,0], \
+                    numpy.array(list(antpos.values()))[:,1], \
+                    c=values, s=800, cmap='bwr', vmin=center-vrng, \
+                    vmax=center+vrng)
+    for i, (ant_no, pos) in enumerate(antpos.items()):
+        if numpy.abs(values[i] - center) < 0.2*vrng:
+            colour='black'
+        else:
+            colour='white'
+        ax.text(pos[0], pos[1], str(ant_no), va='center', ha='center', \
+                color=colour)
+    ax.set_xlabel("East-West [m]")
+    ax.set_ylabel("North-South [m]")
+    ax.set_title(title);
+    ax.axis('equal')
+    fig.colorbar(im, ax=ax)
+    plt.tight_layout()
