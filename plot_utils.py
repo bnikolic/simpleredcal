@@ -180,7 +180,8 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
 
 
 def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
-                     clip_pctile=99, vmax=None, figsize=(11,7)):
+                     clip_pctile=99, vmin=None, vmax=None, center=None, \
+                     cmap=sns.cm.rocket_r, figsize=(11,7)):
     """Plot heatmap of results of redundant calibration
 
     :param df: Results dataframe
@@ -196,8 +197,14 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
     :type clip: bool
     :param clip_pctile: Percentile to clip the data
     :type clip_pctile: int, float
+    :param vmax: Minimum value of heatmap
+    :type vmax: float
     :param vmax: Maximum value of heatmap
     :type vmax: float
+    :param center: Value at which to center the colourmap
+    :type center: float
+    :param cmap: Colour mapping from data values to colour space
+    :type cmap: str, matplotlib colormap name or object, list
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -205,7 +212,10 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
     fig, ax = plt.subplots(figsize=figsize)
     if clip:
         vmax=clip_ylimtop(df, value, clip_pctile)
-    ax = sns.heatmap(piv, vmax=vmax, cmap=sns.cm.rocket_r)
+    if (df[value].values < 0).any():
+        cmap = 'bwr' # divergent colouring
+        center = 0
+    ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-50))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
@@ -215,7 +225,8 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
 
 
 def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
-                    xbase=50, ybase=5, cmap=None, center=None, figsize=(14,7)):
+                    xbase=50, ybase=5, center=None, cmap=sns.cm.rocket_r, \
+                    figsize=(14,7)):
     """Plots heatmap of visibility-related data, with vmax set as a percentile
     of the dataframe
 
@@ -232,10 +243,10 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     :type xbase: int
     :param ybase: x axis limits and tickets are multiples of this value
     :type ybase: int
-    :param cmap: Colour mapping from data values to colour space
-    :type cmap: str, matplotlib colormap name or object, list
     :param center: Value at which to center the colourmap
     :type center: float
+    :param cmap: Colour mapping from data values to colour space
+    :type cmap: str, matplotlib colormap name or object, list
     :param figsize: Figure size of plot
     :type figsize: tuple
 
@@ -250,11 +261,13 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
         clip_pctile_b = (100 - clip_pctile)/2
         clip_pctile = clip_pctile - clip_pctile_b
         vmin = numpy.floor(numpy.nanpercentile(arr, clip_pctile_b)*100)/100
+        cmap = 'bwr' # divergent colouring
+        center = 0
 
     vmax = numpy.ceil(numpy.nanpercentile(arr, clip_pctile)*100)/100
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=0)
+    ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=center)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
