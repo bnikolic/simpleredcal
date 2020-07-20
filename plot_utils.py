@@ -131,7 +131,8 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
     plt.show()
 
 
-def plot_res_grouped(df, col, group_by='success', logy=False, figsize=(12,8)):
+def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
+                     figsize=(12,8)):
     """Plot attribute of calibration results, grouped by another attribute
 
     :param df: Results dataframe
@@ -142,6 +143,8 @@ def plot_res_grouped(df, col, group_by='success', logy=False, figsize=(12,8)):
     :type group_by: str
     :param logy: Bool to make y-axis scale logarithmic
     :type logy: bool
+    :param ylabel: ylabel of the plot
+    :type ylabel: str
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -158,17 +161,21 @@ def plot_res_grouped(df, col, group_by='success', logy=False, figsize=(12,8)):
     if logy:
         ax.set_yscale('log')
         ylog = 'Log '
-    ax.set_ylabel((ylog+ylab_dict[col]).capitalize())
+    if col in ylab_dict.keys():
+        ylabel = ylab_dict[col]
+    ax.set_ylabel((ylog+ylabel).capitalize())
     plt.legend()
     plt.show()
 
+    if ylabel == '':
+        ylabel = col
     if (~df['success']).any():
         pgbmax = round(numpy.max(df[col][~df['success']].values), 3)
     else:
         pgbmax = 'n/a - all minimizations were succesful'
-    print('Max {} for minimizations with {}=False: {}\n'.format(ylab_dict[col], \
+    print('Max {} for minimizations with {}=False: {}\n'.format(ylabel, \
           group_by, pgbmax))
-    print('Max {} for minimizations with {}=True: {}'.format(ylab_dict[col], \
+    print('Max {} for minimizations with {}=True: {}'.format(ylabel, \
           group_by, round(numpy.max(df[col][df['success']].values), 3)))
 
 
