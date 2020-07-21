@@ -66,9 +66,9 @@ def main():
     parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
-    parser.add_argument('-r', '--rp', required=False, action='store_true', \
-                        help='Reduced number of parameters method, using polar \
-                        coordinates - doRelCal vs doRelCalRP')
+    parser.add_argument('-m', '--method', required=False, default='cartesian', \
+                        metavar='M', type=str, help='Method to use - {"cartesian", \
+                        "polar", "RP"}, where RP stands for reduced parameters')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new dataframe')
     args = parser.parse_args()
@@ -165,14 +165,17 @@ def main():
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
-        def cal(redg, dist, obsvis, initp):
+        def cal(redg, distribution, coords, obsvis, initp):
             """Relative redundant calibration with doRelCal: unconstrained
             minimizer using cartesian coordinates - this is the fastest solver
 
             :param redg: Grouped baselines, as returned by groupBls
             :type redg: ndarray
-            :param dist: Distribution to fit likelihood {'gaussian', 'cauchy'}
-            :type dist: str
+            :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+            :type distribution: str
+            :param coords: Coordinate system in which gain and visibility parameters
+            have been set up
+            :type coords: str {"cartesian", "polar"}
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -183,24 +186,24 @@ def main():
             visibilities
             :rtype: Scipy optimization result object
             """
-            res_rel = doRelCal(redg, obsvis, \
-                               distribution=dist, initp=initp)
+            res_rel = doRelCal(redg, obsvis, coords=coords, \
+                               distribution=distribution, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
-            res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
+            res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls, coords=coords)
             # use solution for next solve in iteration
             if res_rel['success']:
                 initp = res_rel['x']
             return res_rel, initp
 
-        def cal_RP(redg, dist, obsvis, initp):
+        def cal_RP(redg, distribution, obsvis, initp):
             """Relative redundant calibration with doRelCalRP: constrained
             minimizer (by reducing the number of parameters) using polar
             coordinates
 
             :param redg: Grouped baselines, as returned by groupBls
             :type redg: ndarray
-            :param dist: Distribution to fit likelihood {'gaussian', 'cauchy'}
-            :type dist: str
+            :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+            :type distribution: str
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -211,19 +214,18 @@ def main():
             visibilities
             :rtype: Scipy optimization result object
             """
-            res_rel, initp_ = doRelCalRP(redg, obsvis, \
-                                         distribution=dist, initp=initp)
+            res_rel, initp_ = doRelCalRP(redg, obsvis, distribution=distribution, \
+                                         initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
                 initp = initp_
             return res_rel, initp
 
-        if args.rp:
-            Cal_f = cal_RP
+        if args.method == 'RP':
+            RelCal = functools.partial(cal_RP, RedG, args.dist)
         else:
-            Cal_f = cal
-        RelCal = functools.partial(Cal_f, RedG, args.dist)
+            RelCal = functools.partial(cal, RedG, args.dist, args.method)
 
         stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output

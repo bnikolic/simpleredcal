@@ -293,6 +293,9 @@ def norm_rel_sols(resx, no_unq_bls, coords='cartesian'):
     :param no_unq_bls: Number of unique baselines (equivalently the number of
     redundant visibilities)
     :type no_unq_bls: int
+    :param coords: Coordinate system in which gain and visibility parameters
+    have been set up
+    :type coords: str {"cartesian", "polar"}
 
     :return: Renormalized visibility and gains solutions array
     :rtype:
