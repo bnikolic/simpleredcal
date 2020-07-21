@@ -52,14 +52,14 @@ def main():
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
                         help='Polarization {"ee", "en", "nn", "ne"}')
-    parser.add_argument('-d', '--deg_dim', required=True, metavar='D', type=str, \
+    parser.add_argument('-x', '--deg_dim', required=True, metavar='X', type=str, \
                         help='Which dimension to compare relatively calibrated \
                         visibility solutions {"tint", "freq", "jd"}')
     parser.add_argument('-c', '--chans', required=False, default=None, metavar='C', \
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to fit {0, 59}')
-    parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
+    parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \

@@ -58,7 +58,7 @@ def main():
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to fit {0, 59}')
-    parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
+    parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-a', '--ref_ant', required=False, default=85, metavar='A', \

@@ -63,7 +63,7 @@ def main():
     parser.add_argument('-f', '--flag_type', required=False, default=None, \
                         metavar='F', type=str, help='Flag type e.g. "first", \
                         "omni", "abs"')
-    parser.add_argument('-m', '--dist', required=False, default='cauchy', metavar='F', \
+    parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-r', '--rp', required=False, action='store_true', \
