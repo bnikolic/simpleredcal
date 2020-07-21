@@ -97,7 +97,7 @@ def clip_ylimtop(df, col, clip_pctile):
 
 
 def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
-             ylabel='', figsize=(12,8)):
+             ylabel='', title=None, figsize=(12,8)):
     """Plot attribute of calibration results
 
     :param df: Results dataframe
@@ -115,6 +115,8 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
     :type ylim: int, float, None
     :param ylabel: ylabel of the plot
     :type ylabel: str
+    :param values: Title of plot
+    :type values: str, None
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -128,6 +130,7 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
     if col in ylab_dict.keys():
         ylabel = ylab_dict[col]
     ax.set_ylabel((ylog+ylabel).capitalize())
+    ax.set_title(title)
     plt.show()
 
 
@@ -277,7 +280,8 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     return fig, ax
 
 
-def antpos_map(values, antpos, title=None, std_rng=2, center=0, figsize=(10, 8)):
+def antpos_map(values, antpos, title=None, std_rng=2, center=None, \
+               cmap='bwr', figsize=(10, 8)):
     """Scatter plot of values attributed to antennas, according to their
     physical positions
 
@@ -292,20 +296,29 @@ def antpos_map(values, antpos, title=None, std_rng=2, center=0, figsize=(10, 8))
     :type std_rng: int, float
     :param center: Value at which to center the colourmap
     :type center: float
+    :param cmap: Colour mapping from data values to colour space
+    :type cmap: str, matplotlib colormap name or object, list
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
     fig, ax = plt.subplots(figsize=(10, 8))
     vrng = numpy.ceil(numpy.std(values)*std_rng*10)/10
+    if center is not None:
+        vmin = center-vrng
+        vmax = center+vrng
+    else:
+        vmin = None
+        vmax = None
+        center = numpy.mean(values)
     im = ax.scatter(numpy.array(list(antpos.values()))[:,0], \
                     numpy.array(list(antpos.values()))[:,1], \
-                    c=values, s=800, cmap='bwr', vmin=center-vrng, \
-                    vmax=center+vrng)
+                    c=values, s=800, cmap=cmap, vmin=vmin, \
+                    vmax=vmax)
     for i, (ant_no, pos) in enumerate(antpos.items()):
-        if numpy.abs(values[i] - center) < 0.2*vrng:
-            colour='black'
-        else:
-            colour='white'
+        colour='white'
+        if cmap == 'bwr':
+            if numpy.abs(values[i] - center) < 0.2*vrng:
+                colour='black'
         ax.text(pos[0], pos[1], str(ant_no), va='center', ha='center', \
                 color=colour)
     ax.set_xlabel("East-West [m]")
