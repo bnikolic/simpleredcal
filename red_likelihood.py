@@ -283,7 +283,7 @@ def makeEArray(arr):
     return arr[:, 0] * np.exp(1j*arr[:, 1])
 
 
-def norm_rel_sols(resx, no_unq_bls):
+def norm_rel_sols(resx, no_unq_bls, coords='cartesian'):
     """Renormalize relative calibration solutions such that the average gain
     amplitude is 1
 
@@ -297,10 +297,18 @@ def norm_rel_sols(resx, no_unq_bls):
     :return: Renormalized visibility and gains solutions array
     :rtype:
     """
-    vis_params, gain_params = np.split(resx, [no_unq_bls*2,])
-    avg_amp = np.mean(np.abs(makeCArray(gain_params)))
-    vis_params = vis_params * avg_amp**2
-    gain_params = gain_params / avg_amp
+    vis_params, gain_params = numpy.split(resx, [no_unq_bls*2,])
+    if coords == 'polar':
+        avg_amp = np.mean(gain_params[::2])
+        gain_params[::2] = gain_params[::2] / avg_amp
+        vis_params[::2] = vis_params[::2] * avg_amp**2
+    elif coords == 'cartesian':
+        avg_amp = np.mean(np.abs(makeCArray(gain_params)))
+        gain_params = gain_params / avg_amp
+        vis_params = vis_params * avg_amp**2
+    else:
+        raise ValueError('Specify a correct coordinate system: {"cartesian, \
+                         polar"}')
     return np.hstack([vis_params, gain_params])
 
 
@@ -325,11 +333,11 @@ def gVis(vis, credg, gains):
 LLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
         'gaussian':lambda delta: np.square(np.abs(delta)).sum()}
 
+makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
-def relative_logLkl(credg, distribution, obsvis, params):
+
+def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
     """Redundant relative likelihood calculator
-
-    *Cartesian coordinates*
 
     We impose that the true sky visibilities from redundant baseline sets are
     equal, and use this prior to calibrate the visibilities (up to some degenerate
@@ -345,27 +353,31 @@ def relative_logLkl(credg, distribution, obsvis, params):
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with credg
     :type obsvis: ndarray
-    :param params: Parameters to constrain: redundant visibilities and gains
-    (Re & Im components interweaved for both)
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param coords: Coordinate system in which gain and visibility parameters
+    have been set up
+    :type coords: str {"cartesian", "polar"}
+    :param params: Parameters to constrain - redundant visibilities and gains
+    (Re & Im [cartesian] or Amp & Phase [polar] components interweaved for both)
     :type params: ndarray
 
     :return: Negative log-likelihood of MLE computation
     :rtype: float
     """
-    no_unq_bls = credg[:, 0].max().item() + 1
     vis_comps, gains_comps = np.split(params, [no_unq_bls*2, ])
-    vis = makeCArray(vis_comps)
-    gains = makeCArray(gains_comps)
+    vis = makeC[coords](vis_comps)
+    gains = makeC[coords](gains_comps)
 
     delta = obsvis - gVis(vis, credg, gains)
     log_likelihood = LLFN[distribution](delta)
     return log_likelihood
 
 
-def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
+def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
+             initp=None, max_nit=1000):
     """Do relative step of redundant calibration
-
-    *Cartesian coordinates*
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
     and the true sky visibilities.
@@ -375,6 +387,9 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with redg
     :type obsvis: ndarray
+    :param coords: Coordinate system in which gain and visibility parameters
+    have been set up
+    :type coords: str {"cartesian", "polar"}
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
     :param initp: Initial parameter guesses for true visibilities and gains
@@ -386,16 +401,27 @@ def doRelCal(redg, obsvis, distribution='cauchy', initp=None, max_nit=1000):
     visibilities
     :rtype: Scipy optimization result object
     """
+    no_unq_bls = numpy.unique(redg[:, 0]).size
     if initp is None:
-        # setup initial parameters
-        ants = numpy.unique(redg[:, 1:])
-        no_unq_bls = numpy.unique(redg[:, 0]).size
-        xvis = np.zeros(no_unq_bls*2) # complex vis
-        xgains = np.ones(ants.size*2) # complex gains (Re & Im components)
+        # set up initial parameters
+        no_ants = numpy.unique(redg[:, 1:]).size
+        if coords == 'cartesian':
+            xvis = np.zeros(no_unq_bls*2) # complex vis
+            xgains = np.ones(no_ants*2) # complex gains (Re & Im components)
+        elif coords == 'polar':
+            xvamps = np.zeros(no_unq_bls) # vis amplitudes
+            xvphases = np.zeros(no_unq_bls) # vis phases
+            xgamps = np.ones(no_ants) # gain amplitudes
+            xgphases = np.zeros(no_ants) # gain phases
+            xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
+            xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
+        else:
+            raise ValueError('Specify a correct coordinate system: {"cartesian, \
+                              polar"}')
         initp = np.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
-                               distribution, obsvis))
+                               distribution, obsvis, no_unq_bls, coords))
     res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
     print(res['message'])
     return res
@@ -432,10 +458,11 @@ def set_gref(gain_comps, ref_ant_idx):
     return gain_comps
 
 
-def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
+def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
+                      params):
     """Redundant relative likelihood calculator
 
-    *Polar coordinates*
+    *Polar coordinates with gain constraints*
 
     We impose that the true sky visibilities from redundant baseline sets are
     equal, and use this prior to calibrate the visibilities (up to some degenerate
@@ -453,15 +480,16 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, params):
     :type obsvis: ndarray
     :param ref_ant_idx: Index of reference antenna in ordered list of antennas
     :type ref_ant_idx: int
-    :param params: Parameters to constrain: redundant visibilities and gains
-    (Re & Im components interweaved for both)
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param params: Parameters to constrain - redundant visibilities and gains
+    (Amp & Phase components interweaved for both)
     :type params: ndarray
 
     :return: Negative log-likelihood of MLE computation
     :rtype: float
     """
-    no_ants = credg[:, 1:].max().item() + 1
-    no_unq_bls = credg[:, 0].max().item() + 1
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
 
     vis = makeEArray(vis_comps)
@@ -500,7 +528,7 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
     no_unq_bls = numpy.unique(redg[:, 0]).size
     ants = numpy.unique(redg[:, 1:])
     if initp is None:
-        # setup initial parameters
+        # set up initial parameters
         # reference antenna gain not included in the initial parameters
         xvamps = np.zeros(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
@@ -512,7 +540,7 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
 
     ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
-             distribution, obsvis, ref_ant_idx))
+             distribution, obsvis, ref_ant_idx, no_unq_bls))
     res = minimize(ff, initp, jac=jacrev(ff), method='BFGS', \
                    options={'maxiter':max_nit})
     print(res['message'])
@@ -578,8 +606,8 @@ def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: float
      """
-    NAnts = credg[:, 1:].max().item() + 1
-    rel_gains_comps, deg_params = np.split(params, [2*NAnts,])
+    no_ants = credg[:, 1:].max().item() + 1
+    rel_gains_comps, deg_params = np.split(params, [2*no_ants,])
     rel_gains = makeEArray(rel_gains_comps)
 
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
@@ -706,7 +734,7 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     """
     ants = numpy.unique(redg[:, 1:])
     if initp is None:
-        # setup initial parameters
+        # set up initial parameters
         xgamps = np.ones(ants.size) # gain amplitudes
         xgphases = np.zeros(ants.size) # gain phases
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
@@ -801,7 +829,7 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
     :rtype: Scipy optimization result object
     """
     if initp is None:
-        # setup initial params: overall amp, x and y phase gradients
+        # set up initial params: overall amp, x and y phase gradients
         initp = np.asarray([1, 0, 0])
 
     ant_sep = red_ant_sep(redg, ant_pos)
