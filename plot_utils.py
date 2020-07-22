@@ -76,8 +76,8 @@ def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots
 ylab_dict = {'nit': 'number of iterations', 'fun': 'log-likelihood'}
 
 
-def clip_ylimtop(df, col, clip_pctile):
-    """Determine the top ylimit, with clipping applied, to better plot the
+def clip_ylim(df, col, clip_pctile, pos='top'):
+    """Determine the top or bottom ylimit, with clipping applied, to better plot the
     selected column in a dataframe
 
     :param df: Results dataframe
@@ -87,13 +87,18 @@ def clip_ylimtop(df, col, clip_pctile):
     :param clip_pctile: Percentile to clip the data
     :type clip_pctile: int, float
     """
+    pos_dict = {'top':numpy.ceil, 'bottom':numpy.floor}
     if col == 'nit':
-        ylimtop = numpy.ceil(numpy.nanpercentile(df[col].values, clip_pctile))
+        ylim = pos_dict[pos](numpy.nanpercentile(df[col].values, clip_pctile))
     else:
-        rnd_base = 10**-numpy.floor(numpy.log10(numpy.median(df[col].values)))
-        ylimtop = numpy.ceil(numpy.nanpercentile(df[col].values, \
+        if (df[col].values < 0).any():
+            ref = numpy.nanpercentile(df[col].values, 85)
+        else:
+            ref = numpy.median(df[col].values)
+        rnd_base = 10**-numpy.floor(numpy.log10(ref))
+        ylim = pos_dict[pos](numpy.nanpercentile(df[col].values, \
                              clip_pctile)*rnd_base)/rnd_base
-    return ylimtop
+    return ylim
 
 
 def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
@@ -122,7 +127,7 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
     """
     ax = df[col].plot(figsize=figsize, ylim=ylim)
     if clip:
-        ax.set_ylim(bottom=0, top=clip_ylimtop(df, col, clip_pctile))
+        ax.set_ylim(bottom=0, top=clip_ylim(df, col, clip_pctile))
     ylog = ''
     if logy:
         ax.set_yscale('log')
@@ -182,15 +187,15 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
           group_by, round(numpy.max(df[col][df['success']].values), 3)))
 
 
-def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
+def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
                      clip_pctile=99, vmin=None, vmax=None, center=None, \
-                     cmap=sns.cm.rocket_r, figsize=(11,7)):
+                     clip_bottom=False, cmap=sns.cm.rocket_r, figsize=(11,7)):
     """Plot heatmap of results of redundant calibration
 
     :param df: Results dataframe
     :type df: DataFrame
-    :param value: Values of pivoted dataframe
-    :type value: str
+    :param col: Attribute to plot
+    :type col: str
     :param index: Index of pivoted dataframe
     :type index: str
     :param columns: Columns of pivoted dataframe
@@ -206,18 +211,28 @@ def plot_res_heatmap(df, value, index='time_int', columns='freq', clip=False, \
     :type vmax: float
     :param center: Value at which to center the colourmap
     :type center: float
+    :param clip_bottom: Clip the bottom values as well as the top ones
+    :type clip_bottom: bool
     :param cmap: Colour mapping from data values to colour space
     :type cmap: str, matplotlib colormap name or object, list
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
-    piv = pd.pivot_table(df, values=value, index=index, columns=columns)
+    piv = pd.pivot_table(df, values=col, index=index, columns=columns)
     fig, ax = plt.subplots(figsize=figsize)
-    if clip:
-        vmax=clip_ylimtop(df, value, clip_pctile)
-    if (df[value].values < 0).any():
+    neg_values = (df[col].values < 0).any()
+    if neg_values:
         cmap = 'bwr' # divergent colouring
         center = 0
+    if clip:
+        if neg_values or clip_bottom:
+            clip_pctile_b = (100 - clip_pctile)/2
+            clip_pctile = clip_pctile - clip_pctile_b
+            vmin = clip_ylim(df, col, clip_pctile_b, pos='bottom')
+        vmax = clip_ylim(df, col, clip_pctile, pos='bottom')
+        # vmax = numpy.ceil(numpy.nanpercentile(df[col].values, clip_pctile)*100)/100
+        # vmin = numpy.floor(numpy.nanpercentile(df[col].values, clip_pctile_b)*100)/100
+
     ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-50))
