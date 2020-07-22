@@ -314,11 +314,15 @@ def antpos_map(values, antpos, title=None, std_rng=2, center=None, \
                     numpy.array(list(antpos.values()))[:,1], \
                     c=values, s=800, cmap=cmap, vmin=vmin, \
                     vmax=vmax)
+    # get RGBA colours of individual points
+    rgba = im.to_rgba(values)
+    # ITU-R 601-2 luma transform to greyscale
+    c_lin = 0.299*rgba[:, 0] + 0.587*rgba[:, 1] + 0.114*rgba[:, 2]
     for i, (ant_no, pos) in enumerate(antpos.items()):
-        colour='white'
-        if cmap == 'bwr':
-            if numpy.abs(values[i] - center) < 0.2*vrng:
-                colour='black'
+        if c_lin[i] > 0.87:
+            colour='black'
+        else:
+            colour='white'
         ax.text(pos[0], pos[1], str(ant_no), va='center', ha='center', \
                 color=colour)
     ax.set_xlabel("East-West [m]")
