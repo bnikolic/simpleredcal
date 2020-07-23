@@ -319,7 +319,7 @@ def split_rel_results(resx, no_unq_bls, coords='cartesian'):
     redundant visibilities)
     :type no_unq_bls: int
 
-    :return: Tuple of complex visibility and gain solution arrays
+    :return: Tuple of visibility and gain solution arrays
     :rtype: tuple
     """
     cfun = {'cartesian':makeCArray, 'polar':makeEArray}
@@ -327,6 +327,26 @@ def split_rel_results(resx, no_unq_bls, coords='cartesian'):
     res_vis = cfun[coords](vis_params)
     res_gains = cfun[coords](gains_params)
     return res_vis, res_gains
+
+
+def split_opt_results(optx, no_ants):
+    """Split the real results array from optimal absolute calibration minimization
+    into complex visibility, degenerate parameter and complex gain arrays
+
+    :param optx: Optimization result for optimal absolute calibration
+    :type optx: ndarray
+    :param no_ants: Number of antennas
+    :type no_ants: int
+
+    :return: Tuple of gain, degenerate parameters and visibility solution arrays
+    :rtype: tuple
+    """
+    no_deg_params = 4 # overall amplitude, overall phase, tilt shifts
+    gains_comps, opt_degp, vis_comps = numpy.split(optx, \
+                                       [2*no_ants, 2*no_ants+no_deg_params,])
+    opt_gains = makeEArray(gains_comps)
+    opt_vis = makeEArray(vis_comps)
+    return opt_gains, opt_degp, opt_vis
 
 
 def mod_str_arg(str_arg):
