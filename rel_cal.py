@@ -215,6 +215,7 @@ def main():
             :rtype: Scipy optimization result object
             """
             res_rel, initp_ = doRelCalRP(redg, obsvis, distribution=distribution, \
+                                         constr_phase=True, bounded=True, \
                                          initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
@@ -222,7 +223,7 @@ def main():
                 initp = initp_
             return res_rel, initp
 
-        if args.method == 'RP':
+        if args.method.upper() == 'RP':
             RelCal = functools.partial(cal_RP, RedG, args.dist)
         else:
             RelCal = functools.partial(cal, RedG, args.dist, args.method)
