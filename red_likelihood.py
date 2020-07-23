@@ -430,7 +430,7 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     return res
 
 
-def set_gref(gain_comps, ref_ant_idx):
+def set_gref(gain_comps, ref_ant_idx, constr_phase):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1 and the mean of all gain
     phases is 0
@@ -439,22 +439,29 @@ def set_gref(gain_comps, ref_ant_idx):
     :type gain_comps: ndarray
     :param ref_ant_idx: Index of reference antenna in ordered list of antennas
     :type ref_ant_idx: int
+    :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
+    :type constr_phase: bool
 
     :return: Interweaved polar gain components with reference gain included
     :rtype: ndarray
     """
     # Cannot assign directly to gain_comps because get
     # TypeError: JAX 'Tracer' objects do not support item assignment
-    gamps = gain_comps[::2]
+    if constr_phase:
+        gamps = gain_comps[::2]
+    else:
+        gamps = gain_comps[:-1:2]
+        gphaseref = gain_comps[-1]
     gphases = gain_comps[1::2]
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
     # set reference gain constraints
     gampref = 1/gamps.prod() # constraint that the product of amps is 1
     # gampref = 1 + gamps.size - gamps.sum() # constraint that the sum of amps is 1
-    gphaseref = -gphases.sum() # constraint that the mean phase is 0
-    # gphaseref = -circmean(gphases) # constraint that the circular mean phase is 0
-    # gphaseref = 0 # set the phase of the reference antenna to be 0
+    if constr_phase:
+        gphaseref = -gphases.sum() # constraint that the mean phase is 0
+        # gphaseref = -circmean(gphases) # constraint that the circular mean phase is 0
+        # gphaseref = 0 # set the phase of the reference antenna to be 0
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, gphaseref, gphase2])
     gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
@@ -462,7 +469,7 @@ def set_gref(gain_comps, ref_ant_idx):
 
 
 def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
-                      params):
+                      constr_phase, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain constraints*
@@ -486,6 +493,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :param no_unq_bls: Number of unique baselines (equivalently the number of
     redundant visibilities)
     :type no_unq_bls: int
+    :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
+    :type constr_phase: bool
     :param params: Parameters to constrain - redundant visibilities and gains
     (Amp & Phase components interweaved for both)
     :type params: ndarray
@@ -496,7 +505,7 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
 
     vis = makeEArray(vis_comps)
-    gains = makeEArray(set_gref(gain_comps, ref_ant_idx))
+    gains = makeEArray(set_gref(gain_comps, ref_ant_idx, constr_phase))
 
     delta = obsvis - gVis(vis, credg, gains)
     log_likelihood = LLFN[distribution](delta)
@@ -504,13 +513,13 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
 
 
 def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
-               max_nit=1000):
+               constr_phase=False, max_nit=1000):
     """Do relative step of redundant calibration
 
-    *Polar coordinates*
+    *Polar coordinates with constraints*
 
-    Initial parameter guesses, if not specified, are 1*e(0j) for both the gains
-    and the true sky visibilities.
+    Initial parameter guesses, if not specified, are 1*e(0j) and 0*e(0j) for
+    the gains and the true sky visibilities.
 
     :param redg: Grouped baselines, as returned by groupBls
     :type redg: ndarray
@@ -521,6 +530,8 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
     :type distribution: str
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
+    :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
+    :type constr_phase: bool
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
 
@@ -540,17 +551,20 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
+        if not constr_phase:
+            initp = np.append(initp, np.array([0]))
 
     ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
-             distribution, obsvis, ref_ant_idx, no_unq_bls))
+             distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase))
     res = minimize(ff, initp, jac=jacrev(ff), method='BFGS', \
                    options={'maxiter':max_nit})
     print(res['message'])
 
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
-    res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx)])
+    res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx, \
+                                              constr_phase)])
     return res, initp
 
 
