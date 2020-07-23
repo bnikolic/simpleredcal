@@ -379,7 +379,7 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
 
 
 def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
-             initp=None, max_nit=1000):
+             bounded=False, initp=None, max_nit=1000):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -395,6 +395,9 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     :type coords: str {"cartesian", "polar"}
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
+    :param bounded: Bounded optimization, where the amplitudes for the visibilities
+    and the gains must be > 0. 'trust-constr' method used.
+    :type bounded: bool
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
@@ -408,10 +411,10 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     if initp is None:
         # set up initial parameters
         no_ants = numpy.unique(redg[:, 1:]).size
-        if coords == 'cartesian':
+        if coords == 'cartesian': # (Re & Im components)
             xvis = np.zeros(no_unq_bls*2) # complex vis
-            xgains = np.ones(no_ants*2) # complex gains (Re & Im components)
-        elif coords == 'polar':
+            xgains = np.ones(no_ants*2) # complex gains
+        elif coords == 'polar': # (Amp & Phase components)
             xvamps = np.zeros(no_unq_bls) # vis amplitudes
             xvphases = np.zeros(no_unq_bls) # vis phases
             xgamps = np.ones(no_ants) # gain amplitudes
@@ -425,7 +428,23 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
                                distribution, obsvis, no_unq_bls, coords))
-    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
+
+    if bounded and coords == 'polar':
+        lb = numpy.repeat(-np.inf, initp.size)
+        ub = numpy.repeat(np.inf, initp.size)
+        lb[::2] = 0 # lower bound for gain and vis amplitudes
+        bounds = Bounds(lb, ub)
+        method = 'trust-constr'
+        jac = None
+        hess = jacfwd(jacrev(ff))
+    else:
+        bounds = None
+        method = 'BFGS'
+        jac = jacrev(ff)
+        hess = None
+
+    res = minimize(ff, initp, bounds=bounds, method=method, \
+                   jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
     return res
 
@@ -512,8 +531,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     return log_likelihood
 
 
-def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
-               constr_phase=False, max_nit=1000):
+def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
+               constr_phase=False, bounded=False, initp=None, max_nit=1000):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -528,10 +547,13 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
     :type obsvis: ndarray
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
-    :param initp: Initial parameter guesses for true visibilities and gains
-    :type initp: ndarray, None
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
     :type constr_phase: bool
+    :param bounded: Bounded optimization, where the amplitudes for the visibilities
+    and the gains must be > 0. 'trust-constr' method used.
+    :type bounded: bool
+    :param initp: Initial parameter guesses for true visibilities and gains
+    :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
 
@@ -557,8 +579,23 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, initp=None, \
     ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
              distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase))
-    res = minimize(ff, initp, jac=jacrev(ff), method='BFGS', \
-                   options={'maxiter':max_nit})
+
+    if bounded:
+        lb = numpy.repeat(-np.inf, initp.size)
+        ub = numpy.repeat(np.inf, initp.size)
+        lb[:2*(no_unq_bls+ants.size-1):2] = 0 # lower bound for gain and vis amplitudes
+        bounds = Bounds(lb, ub)
+        method = 'trust-constr'
+        jac = None
+        hess = jacfwd(jacrev(ff))
+    else:
+        bounds = None
+        method = 'BFGS'
+        jac = jacrev(ff)
+        hess = None
+
+    res = minimize(ff, initp, bounds=bounds, method=method, \
+                   jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
 
     initp = numpy.copy(res['x']) # to reuse parameters
