@@ -234,6 +234,10 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
         # vmin = numpy.floor(numpy.nanpercentile(df[col].values, clip_pctile_b)*100)/100
 
     ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center)
+    # all_x = numpy.unique(df.reset_index()[columns].values)
+    # xticks = numpy.arange(numpy.min(all_x), numpy.max(all_x), 50)
+    # ax.set_xticks(xticks)
+    # ax.set_xticklabels(xticks)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-50))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
