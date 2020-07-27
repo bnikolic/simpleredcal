@@ -449,6 +449,30 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     return res
 
 
+def rotate_phase(rel_resx, no_unq_bls):
+    """Rotate phases of gains by +pi and make amplitude positive, for gains that
+    have negative amplitude gain solutions from relative redundant calibration
+
+    :param : ndarray
+    :type :
+
+    :return:
+    :rtype: ndarray
+    """
+    vis_params, gains_params = numpy.split(rel_resx, [no_unq_bls*2,])
+    rel_gamps = gains_params[::2]
+    rel_gphases = gains_params[1::2]
+    neg_amp_idxs = numpy.where(rel_gamps < 0)[0]
+    # rotating phases of gains with negative amplitudes by +pi
+    rel_gphases[neg_amp_idxs] += numpy.pi
+    # taking principle angle of those phases (required?)
+    rel_gphases[neg_amp_idxs] = (rel_gphases[neg_amp_idxs] + numpy.pi) % \
+                                (2*numpy.pi) - numpy.pi
+    rel_gamps[neg_amp_idxs] = numpy.abs(rel_gamps[neg_amp_idxs])
+    mod_gain_params = numpy.ravel(numpy.vstack((rel_gamps, rel_gphases)), order='F')
+    return numpy.hstack([vis_params, mod_gain_params])
+
+
 def set_gref(gain_comps, ref_ant_idx, constr_phase):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1 and the mean of all gain
