@@ -449,14 +449,20 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     return res
 
 
-def rotate_phase(rel_resx, no_unq_bls):
+def rotate_phase(rel_resx, no_unq_bls, principle_angle=False):
     """Rotate phases of gains by +pi and make amplitude positive, for gains that
     have negative amplitude gain solutions from relative redundant calibration
 
-    :param : ndarray
-    :type :
+    :param rel_resx: Polar relative calibration results
+    :type rel_resx: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param principle_angle:
+    :type principle_angle:
 
-    :return:
+    :return: Modified relative calibration results with positive gain amplitudes
+    and phases rotated by +pi for the gains with previously negative amplitude
     :rtype: ndarray
     """
     vis_params, gains_params = numpy.split(rel_resx, [no_unq_bls*2,])
@@ -465,9 +471,10 @@ def rotate_phase(rel_resx, no_unq_bls):
     neg_amp_idxs = numpy.where(rel_gamps < 0)[0]
     # rotating phases of gains with negative amplitudes by +pi
     rel_gphases[neg_amp_idxs] += numpy.pi
-    # taking principle angle of those phases (required?)
-    rel_gphases[neg_amp_idxs] = (rel_gphases[neg_amp_idxs] + numpy.pi) % \
-                                (2*numpy.pi) - numpy.pi
+    if principle_angle:
+        # taking the principle angle of those phases (required?)
+        rel_gphases[neg_amp_idxs] = (rel_gphases[neg_amp_idxs] + numpy.pi) % \
+                                    (2*numpy.pi) - numpy.pi
     rel_gamps[neg_amp_idxs] = numpy.abs(rel_gamps[neg_amp_idxs])
     mod_gain_params = numpy.ravel(numpy.vstack((rel_gamps, rel_gphases)), order='F')
     return numpy.hstack([vis_params, mod_gain_params])
