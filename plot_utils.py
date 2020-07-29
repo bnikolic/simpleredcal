@@ -88,15 +88,20 @@ def clip_ylim(df, col, clip_pctile, pos='top'):
     :type clip_pctile: int, float
     """
     pos_dict = {'top':numpy.ceil, 'bottom':numpy.floor}
+    values = df[col].values
     if col == 'nit':
-        ylim = pos_dict[pos](numpy.nanpercentile(df[col].values, clip_pctile))
+        ylim = pos_dict[pos](numpy.nanpercentile(values, clip_pctile))
     else:
-        if (df[col].values < 0).any():
-            ref = numpy.nanpercentile(df[col].values, 85)
+        if numpy.inf in values:
+            values = values[values != numpy.inf]
+        if -numpy.inf in values:
+            values = values[values != -numpy.inf]
+        if (values < 0).any():
+            ref = numpy.nanpercentile(values, 85)
         else:
-            ref = numpy.median(df[col].values)
+            ref = numpy.median(values)
         rnd_base = 10**-numpy.floor(numpy.log10(ref))
-        ylim = pos_dict[pos](numpy.nanpercentile(df[col].values, \
+        ylim = pos_dict[pos](numpy.nanpercentile(values, \
                              clip_pctile)*rnd_base)/rnd_base
     return ylim
 
