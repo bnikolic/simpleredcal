@@ -17,6 +17,7 @@ from jax.config import config
 config.update('jax_enable_x64', True)
 import jax
 from jax import jit, jacrev, jacfwd
+from jax.scipy.optimize import minimize as jminimize
 
 # n.b. where 'numpy' is used below it has to be real numpy. 'np' can be
 # either jax or real numpy
@@ -379,7 +380,7 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
 
 
 def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
-             bounded=False, initp=None, max_nit=1000):
+             bounded=False, initp=None, max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -402,6 +403,8 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
+    :param jax_minimizer: Use jax minimization implementation - only if unbounded
+    :type jax_minimizer: bool
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -429,22 +432,26 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
                                distribution, obsvis, no_unq_bls, coords))
 
-    if bounded and coords == 'polar':
-        lb = numpy.repeat(-np.inf, initp.size)
-        ub = numpy.repeat(np.inf, initp.size)
-        lb[::2] = 0 # lower bound for gain and vis amplitudes
-        bounds = Bounds(lb, ub)
-        method = 'trust-constr'
-        jac = None
-        hess = jacfwd(jacrev(ff))
+    if jax_minimizer and not bounded:
+        res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
+              ._asdict()
+        print('status: {}'.format(res['status']))
     else:
-        bounds = None
-        method = 'BFGS'
-        jac = jacrev(ff)
-        hess = None
-
-    res = minimize(ff, initp, bounds=bounds, method=method, \
-                   jac=jac, hess=hess, options={'maxiter':max_nit})
+        if bounded and coords == 'polar':
+            lb = numpy.repeat(-np.inf, initp.size)
+            ub = numpy.repeat(np.inf, initp.size)
+            lb[::2] = 0 # lower bound for gain and vis amplitudes
+            bounds = Bounds(lb, ub)
+            method = 'trust-constr'
+            jac = None
+            hess = jacfwd(jacrev(ff))
+        else:
+            bounds = None
+            method = 'BFGS'
+            jac = jacrev(ff)
+            hess = None
+        res = minimize(ff, initp, bounds=bounds, method=method, \
+                       jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
     return res
 
@@ -563,7 +570,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
 
 
 def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
-               constr_phase=False, bounded=False, initp=None, max_nit=1000):
+               constr_phase=False, bounded=False, initp=None, max_nit=1000, \
+               jax_minimizer=False):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -587,6 +595,8 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
+    :param jax_minimizer: Use jax minimization implementation - only if unbounded
+    :type jax_minimizer: bool
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -611,24 +621,27 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
              distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase))
 
-    if bounded:
-        lb = numpy.repeat(-np.inf, initp.size)
-        ub = numpy.repeat(np.inf, initp.size)
-        lb[:2*(no_unq_bls+ants.size-1):2] = 0 # lower bound for gain and vis amplitudes
-        bounds = Bounds(lb, ub)
-        method = 'trust-constr'
-        jac = None
-        hess = jacfwd(jacrev(ff))
+    if jax_minimizer and not bounded:
+        res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
+              ._asdict()
+        print('status: {}'.format(res['status']))
     else:
-        bounds = None
-        method = 'BFGS'
-        jac = jacrev(ff)
-        hess = None
-
-    res = minimize(ff, initp, bounds=bounds, method=method, \
-                   jac=jac, hess=hess, options={'maxiter':max_nit})
+        if bounded:
+            lb = numpy.repeat(-np.inf, initp.size)
+            ub = numpy.repeat(np.inf, initp.size)
+            lb[:2*(no_unq_bls+ants.size-1):2] = 0 # lower bound for gain and vis amplitudes
+            bounds = Bounds(lb, ub)
+            method = 'trust-constr'
+            jac = None
+            hess = jacfwd(jacrev(ff))
+        else:
+            bounds = None
+            method = 'BFGS'
+            jac = jacrev(ff)
+            hess = None
+        res = minimize(ff, initp, bounds=bounds, method=method, \
+                       jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
-
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx, \
