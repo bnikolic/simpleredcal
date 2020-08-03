@@ -636,9 +636,9 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
             lb[:2*(no_unq_bls+ants.size-1):2] = 0 # lower bound for gain and vis amplitudes
             bounds = Bounds(lb, ub)
             # method = 'L-BFGS-B' # get b'ABNORMAL_TERMINATION_IN_LNSRCH'
-            # hess = None
             # jac = lambda x: numpy.array(jacrev(ff)(x))
-            # max_nit = max(10000, max_nit)
+            # hess = None
+            # max_nit = min(15000, max_nit)
             method = 'trust-constr'
             jac = None
             hess = jacfwd(jacrev(ff))
