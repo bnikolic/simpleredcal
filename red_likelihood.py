@@ -380,7 +380,8 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
 
 
 def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
-             bounded=False, initp=None, max_nit=1000, jax_minimizer=False):
+             bounded=False, initp=None, norm_gains=False, max_nit=1000, \
+             jax_minimizer=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -401,6 +402,8 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     :type bounded: bool
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
+    :param norm_gains: Normalize result gain amplitudes such that their mean is 1
+    :type norm_gains: bool
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
     :param jax_minimizer: Use jax minimization implementation - only if unbounded
@@ -457,6 +460,8 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
         res = minimize(ff, initp, bounds=bounds, method=method, \
                        jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
+    if norm_gains:
+        res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords=coords)
     return res
 
 
