@@ -311,8 +311,8 @@ def norm_rel_sols(resx, no_unq_bls, coords='cartesian'):
         gain_params = gain_params / avg_amp
         vis_params = vis_params * avg_amp**2
     else:
-        raise ValueError('Specify a correct coordinate system: {"cartesian, \
-                         polar"}')
+        raise ValueError('Specify a correct coordinate system: {"cartesian", \
+                         "polar"}')
     return np.hstack([vis_params, gain_params])
 
 
@@ -428,8 +428,8 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
             xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
             xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         else:
-            raise ValueError('Specify a correct coordinate system: {"cartesian, \
-                              polar"}')
+            raise ValueError('Specify a correct coordinate system: {"cartesian", \
+                             "polar"}')
         initp = np.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
@@ -496,7 +496,7 @@ def rotate_phase(rel_resx, no_unq_bls, principle_angle=False):
     return numpy.hstack([vis_params, mod_gain_params])
 
 
-def set_gref(gain_comps, ref_ant_idx, constr_phase):
+def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1 and the mean of all gain
     phases is 0
@@ -507,6 +507,9 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase):
     :type ref_ant_idx: int
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
     :type constr_phase: bool
+    :param amp_constr: Constraint to apply to gain amplitudes: either the
+    {"prod", "mean"} of gain amplitudes = 1
+    :type amp_constr: str
 
     :return: Interweaved polar gain components with reference gain included
     :rtype: ndarray
@@ -522,8 +525,13 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase):
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
     # set reference gain constraints
-    gampref = 1/gamps.prod() # constraint that the product of amps is 1
-    # gampref = 1 + gamps.size - gamps.sum() # constraint that the sum of amps is 1
+    if amp_constr == 'prod':
+        gampref = 1/gamps.prod() # constraint that the product of amps is 1
+    elif amp_constr == 'mean':
+        gampref = 1 + gamps.size - gamps.sum() # constraint that the sum of amps is 1
+    else:
+        raise ValueError('Specify a correct gain amplitude constraint: \
+                         {"prod", "mean"}')
     if constr_phase:
         gphaseref = -gphases.sum() # constraint that the mean phase is 0
         # gphaseref = -circmean(gphases) # constraint that the circular mean phase is 0
@@ -535,7 +543,7 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase):
 
 
 def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
-                      constr_phase, params):
+                      constr_phase, amp_constr, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain constraints*
@@ -561,6 +569,9 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :type no_unq_bls: int
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
     :type constr_phase: bool
+    :param amp_constr: Constraint to apply to gain amplitudes: either the
+    {"prod", "mean"} of gain amplitudes = 1
+    :type amp_constr: str
     :param params: Parameters to constrain - redundant visibilities and gains
     (Amp & Phase components interweaved for both)
     :type params: ndarray
@@ -571,7 +582,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
 
     vis = makeEArray(vis_comps)
-    gains = makeEArray(set_gref(gain_comps, ref_ant_idx, constr_phase))
+    gains = makeEArray(set_gref(gain_comps, ref_ant_idx, constr_phase, \
+                                amp_constr))
 
     delta = obsvis - gVis(vis, credg, gains)
     log_likelihood = LLFN[distribution](delta)
@@ -579,8 +591,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
 
 
 def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
-               constr_phase=False, bounded=False, initp=None, max_nit=1000, \
-               jax_minimizer=False):
+               constr_phase=False, amp_constr='prod', bounded=False, initp=None, \
+               max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -597,6 +609,9 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
     :type distribution: str
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
     :type constr_phase: bool
+    :param amp_constr: Constraint to apply to gain amplitudes: either the
+    {"prod", "mean"} of gain amplitudes = 1
+    :type amp_constr: str
     :param bounded: Bounded optimization, where the amplitudes for the visibilities
     and the gains must be > 0. 'trust-constr' method used.
     :type bounded: bool
@@ -628,7 +643,8 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
 
     ref_ant_idx = condenseMap(ants)[ref_ant]
     ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
-             distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase))
+             distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase, \
+             amp_constr))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
@@ -658,7 +674,7 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx, \
-                                              constr_phase)])
+                                              constr_phase, amp_constr)])
     return res, initp
 
 
