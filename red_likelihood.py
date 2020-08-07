@@ -414,9 +414,9 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     :rtype: Scipy optimization result object
     """
     no_unq_bls = numpy.unique(redg[:, 0]).size
+    no_ants = numpy.unique(redg[:, 1:]).size
     if initp is None:
         # set up initial parameters
-        no_ants = numpy.unique(redg[:, 1:]).size
         if coords == 'cartesian': # (Re & Im components)
             xvis = np.zeros(no_unq_bls*2) # complex vis
             xgains = np.ones(no_ants*2) # complex gains
@@ -461,11 +461,15 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
                        jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
     if norm_gains:
-        res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords=coords)
+        if coords == 'polar' and (res['x'][-2*no_ants::2] < 0).any():
+            print('Relative calibration solutions were not normalized, as some '\
+                  'negative gain amplitudes were found.')
+        else:
+            res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords=coords)
     return res
 
 
-def rotate_phase(rel_resx, no_unq_bls, principle_angle=False):
+def rotate_phase(rel_resx, no_unq_bls, principle_angle=False, norm_gains=False):
     """Rotate phases of gains by +pi and make amplitude positive, for gains that
     have negative amplitude gain solutions from relative redundant calibration
 
@@ -476,6 +480,8 @@ def rotate_phase(rel_resx, no_unq_bls, principle_angle=False):
     :type no_unq_bls: int
     :param principle_angle:
     :type principle_angle:
+    :param norm_gains: Normalize result gain amplitudes such that their mean is 1
+    :type norm_gains: bool
 
     :return: Modified relative calibration results with positive gain amplitudes
     and phases rotated by +pi for the gains with previously negative amplitude
@@ -484,16 +490,28 @@ def rotate_phase(rel_resx, no_unq_bls, principle_angle=False):
     vis_params, gains_params = numpy.split(rel_resx, [no_unq_bls*2,])
     rel_gamps = gains_params[::2]
     rel_gphases = gains_params[1::2]
-    neg_amp_idxs = numpy.where(rel_gamps < 0)[0]
+    rel_vamps = vis_params[::2]
+    rel_vphases = vis_params[1::2]
     # rotating phases of gains with negative amplitudes by +pi
-    rel_gphases[neg_amp_idxs] += numpy.pi
+    neg_gamp_idxs = numpy.where(rel_gamps < 0)[0]
+    rel_gphases[neg_gamp_idxs] += numpy.pi
+    # rotating phases of visibilities with negative amplitudes by +pi
+    neg_vamp_idxs = numpy.where(rel_vamps < 0)[0]
+    rel_vphases[neg_vamp_idxs] += numpy.pi
     if principle_angle:
         # taking the principle angle of those phases (required?)
-        rel_gphases[neg_amp_idxs] = (rel_gphases[neg_amp_idxs] + numpy.pi) % \
-                                    (2*numpy.pi) - numpy.pi
-    rel_gamps[neg_amp_idxs] = numpy.abs(rel_gamps[neg_amp_idxs])
-    mod_gain_params = numpy.ravel(numpy.vstack((rel_gamps, rel_gphases)), order='F')
-    return numpy.hstack([vis_params, mod_gain_params])
+        rel_gphases[neg_gamp_idxs] = (rel_gphases[neg_gamp_idxs] + numpy.pi) % \
+                                     (2*numpy.pi) - numpy.pi
+        rel_vphases[neg_vamp_idxs] = (rel_vphases[neg_vamp_idxs] + numpy.pi) % \
+                                     (2*numpy.pi) - numpy.pi
+    rel_gamps[neg_gamp_idxs] = numpy.abs(rel_gamps[neg_gamp_idxs])
+    rel_vamps[neg_vamp_idxs] = numpy.abs(rel_vamps[neg_vamp_idxs])
+    mod_gain_params = numpy.ravel(numpy.vstack((rel_gamps, rel_gphases)), \
+                                  order='F')
+    new_res_relx = numpy.hstack([vis_params, mod_gain_params])
+    if norm_gains:
+        new_res_relx = norm_rel_sols(new_res_relx, no_unq_bls, coords='polar')
+    return new_res_relx
 
 
 def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
