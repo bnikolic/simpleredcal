@@ -225,8 +225,10 @@ def main():
 
         if args.method.upper() == 'RP':
             RelCal = functools.partial(cal_RP, RedG, args.dist)
+            coords = 'polar'
         else:
             RelCal = functools.partial(cal, RedG, args.dist, args.method)
+            coords = args.method
 
         stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
@@ -252,7 +254,8 @@ def main():
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
-        df = append_residuals_rel(df, cData, relabelAnts(RedG), out_fn=None)
+        df = append_residuals_rel(df, cData, relabelAnts(RedG), coords, \
+                                  out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)

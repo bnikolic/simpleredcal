@@ -38,7 +38,7 @@ def abs_residuals(residuals):
             for i in ('real', 'imag')]
 
 
-def append_residuals_rel(rel_df, cdata, credg, out_fn=None):
+def append_residuals_rel(rel_df, cdata, credg, coords, out_fn=None):
     """Calculates the residuals and normalized residuals for the relative redundant
     calibration fitting, for each frequency and time integration slice, and
     appends the residual results to the existing relative calibration results
@@ -53,6 +53,9 @@ def append_residuals_rel(rel_df, cdata, credg, out_fn=None):
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
     :type credg: ndarray
+    :param coords: Coordinate system in which gain and visibility parameters
+    have been set up
+    :type coords: str {"cartesian", "polar"}
     :param out_fn: Output dataframe file name. If None, file not pickled.
     :type out_fn: str, None
 
@@ -84,7 +87,8 @@ def append_residuals_rel(rel_df, cdata, credg, out_fn=None):
             cmap_f = dict(map(reversed, enumerate(freqs)))
             cmap_t = dict(map(reversed, enumerate(tints)))
             resx = row.values[cidx:].astype(float)
-            res_rel_vis, res_rel_gains = split_rel_results(resx, no_unq_bls)
+            res_rel_vis, res_rel_gains = split_rel_results(resx, no_unq_bls, \
+                                                           coords)
             obs_vis = cdata[cmap_f[row['freq']], cmap_t[row['time_int']], :]
             pred_rel_vis = gVis(res_rel_vis, credg, res_rel_gains)
             rel_residuals = obs_vis - pred_rel_vis
