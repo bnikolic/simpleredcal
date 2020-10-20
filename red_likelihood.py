@@ -130,6 +130,11 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     data = {k: v for k, v in data.items() if k[0] != k[1]} # flt autos
     flags = {k: flags[k] for k in data.keys()} # apply same flt to flags
 
+    # for H3C datasets, where some of the keys are in the wrong order
+    # reorder keys such that (i, j, pol), with j>i
+    data = dict(sorted({((j, i, p) if i > j else (i, j, p)): v for \
+                        (i, j, p), v in data.items()}.items()))
+
     no_tints, no_chans = data[list(data.keys())[0]].shape # get data dimensions
     if chans is None:
         chans = np.arange(no_chans) # indices, not channel numbers
@@ -141,6 +146,7 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
         tints = np.arange(no_tints)
 
     if flag_path is not None:
+        # for H1C datasets; H3C+ have different flagging files
         hc = HERACal(flag_path)
         _, cal_flags, _, _ = hc.read()
         # filtering flags data
