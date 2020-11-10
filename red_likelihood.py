@@ -385,7 +385,7 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
     return log_likelihood
 
 
-def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
+def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
              bounded=False, initp=None, norm_gains=False, max_nit=1000, \
              jax_minimizer=False):
     """Do relative step of redundant calibration
@@ -393,11 +393,20 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     Initial parameter guesses, if not specified, are 1+1j for both the gains
     and the true sky visibilities.
 
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with redg
     :type obsvis: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param no_ants: Number of antennas for given observation
+    :type ants: int
+    :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
+    Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
+    :type ref_ant_idx: int
     :param coords: Coordinate system in which gain and visibility parameters
     have been set up
     :type coords: str {"cartesian", "polar"}
@@ -419,8 +428,6 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
     visibilities
     :rtype: Scipy optimization result object
     """
-    no_unq_bls = numpy.unique(redg[:, 0]).size
-    no_ants = numpy.unique(redg[:, 1:]).size
     if initp is None:
         # set up initial parameters
         if coords == 'cartesian': # (Re & Im components)
@@ -438,8 +445,8 @@ def doRelCal(redg, obsvis, coords='cartesian', distribution='cauchy', \
                              "polar"}')
         initp = np.hstack([xvis, xgains])
 
-    ff = jit(functools.partial(relative_logLkl, relabelAnts(redg), \
-                               distribution, obsvis, no_unq_bls, coords))
+    ff = jit(functools.partial(relative_logLkl, credg, distribution, obsvis, \
+                               no_unq_bls, coords))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
@@ -614,7 +621,7 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     return log_likelihood
 
 
-def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
+def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_ant_idx=16, \
                constr_phase=False, amp_constr='prod', bounded=False, initp=None, \
                max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
@@ -624,11 +631,20 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
     Initial parameter guesses, if not specified, are 1*e(0j) and 0*e(0j) for
     the gains and the true sky visibilities.
 
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with redg
     :type obsvis: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param no_ants: Number of antennas for given observation
+    :type ants: int
+    :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
+    Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
+    :type ref_ant_idx: int
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
@@ -650,23 +666,20 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
     visibilities
     :rtype: Scipy optimization result object
     """
-    no_unq_bls = numpy.unique(redg[:, 0]).size
-    ants = numpy.unique(redg[:, 1:])
     if initp is None:
         # set up initial parameters
         # reference antenna gain not included in the initial parameters
         xvamps = np.zeros(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
-        xgamps = np.ones(ants.size-1) # gain amplitudes
-        xgphases = np.zeros(ants.size-1) # gain phases
+        xgamps = np.ones(no_ants-1) # gain amplitudes
+        xgphases = np.zeros(no_ants-1) # gain phases
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
         if not constr_phase:
             initp = np.append(initp, np.array([0]))
 
-    ref_ant_idx = condenseMap(ants)[ref_ant]
-    ff = jit(functools.partial(relative_logLklRP, relabelAnts(redg), \
+    ff = jit(functools.partial(relative_logLklRP, credg, \
              distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase, \
              amp_constr))
 
@@ -678,7 +691,7 @@ def doRelCalRP(redg, obsvis, distribution='cauchy', ref_ant=55, \
         if bounded:
             lb = numpy.repeat(-np.inf, initp.size)
             ub = numpy.repeat(np.inf, initp.size)
-            lb[:2*(no_unq_bls+ants.size-1):2] = 0 # lower bound for gain and vis amplitudes
+            lb[:2*(no_unq_bls+no_ants-1):2] = 0 # lower bound for gain and vis amplitudes
             bounds = Bounds(lb, ub)
             # method = 'L-BFGS-B' # get b'ABNORMAL_TERMINATION_IN_LNSRCH'
             # jac = lambda x: numpy.array(jacrev(ff)(x))

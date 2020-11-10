@@ -152,6 +152,7 @@ def main():
         # to get fields for the csv header
         no_ants = numpy.unique(RedG[:, 1:]).size
         no_unq_bls = numpy.unique(RedG[:, 0]).size
+        cRedG = relabelAnts(RedG)
         psize = (no_ants + no_unq_bls)*2
 
         # discarding 'jac', 'hess_inv', 'nfev', 'njev'
@@ -165,17 +166,23 @@ def main():
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
-        def cal(redg, distribution, coords, obsvis, initp):
+        def cal(credg, distribution, coords, no_unq_bls, no_ants, obsvis, initp):
             """Relative redundant calibration with doRelCal: unconstrained
             minimizer using cartesian coordinates - this is the fastest solver
 
-            :param redg: Grouped baselines, as returned by groupBls
-            :type redg: ndarray
+            :param credg: Grouped baselines, condensed so that antennas are
+            consecutively labelled. See relabelAnts
+            :type credg: ndarray
             :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
             :type distribution: str
             :param coords: Coordinate system in which gain and visibility parameters
             have been set up
             :type coords: str {"cartesian", "polar"}
+            :param no_unq_bls: Number of unique baselines (equivalently the number of
+            redundant visibilities)
+            :type no_unq_bls: int
+            :param no_ants: Number of antennas for given observation
+            :type ants: int
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -186,7 +193,7 @@ def main():
             visibilities
             :rtype: Scipy optimization result object
             """
-            res_rel = doRelCal(redg, obsvis, coords=coords, \
+            res_rel = doRelCal(credg, obsvis, no_unq_bls, no_ants, coords=coords, \
                                distribution=distribution, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls, coords=coords)
@@ -195,15 +202,21 @@ def main():
                 initp = res_rel['x']
             return res_rel, initp
 
-        def cal_RP(redg, distribution, obsvis, initp):
+        def cal_RP(credg, distribution, obsvis, no_unq_bls, no_ants, initp):
             """Relative redundant calibration with doRelCalRP: constrained
             minimizer (by reducing the number of parameters) using polar
             coordinates
 
-            :param redg: Grouped baselines, as returned by groupBls
-            :type redg: ndarray
+            :param credg: Grouped baselines, condensed so that antennas are
+            consecutively labelled. See relabelAnts
+            :type credg: ndarray
             :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
             :type distribution: str
+            :param no_unq_bls: Number of unique baselines (equivalently the number of
+            redundant visibilities)
+            :type no_unq_bls: int
+            :param no_ants: Number of antennas for given observation
+            :type ants: int
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -214,9 +227,9 @@ def main():
             visibilities
             :rtype: Scipy optimization result object
             """
-            res_rel, initp_ = doRelCalRP(redg, obsvis, distribution=distribution, \
-                                         constr_phase=True, bounded=True, \
-                                         initp=initp)
+            res_rel, initp_ = doRelCalRP(credg, obsvis, no_unq_bls, no_ants, \
+                                         distribution=distribution, constr_phase=True, \
+                                         bounded=True, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -224,10 +237,11 @@ def main():
             return res_rel, initp
 
         if args.method.upper() == 'RP':
-            RelCal = functools.partial(cal_RP, RedG, args.dist)
+            RelCal = functools.partial(cal_RP, cRedG, args.dist, no_unq_bls, no_ants)
             coords = 'polar'
         else:
-            RelCal = functools.partial(cal, RedG, args.dist, args.method)
+            RelCal = functools.partial(cal, cRedG, args.dist, args.method, no_unq_bls, \
+                                       no_ants)
             coords = args.method
 
         stdout = io.StringIO()
@@ -254,7 +268,7 @@ def main():
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
-        df = append_residuals_rel(df, cData, relabelAnts(RedG), coords, \
+        df = append_residuals_rel(df, cData, cRedG, coords, \
                                   out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
