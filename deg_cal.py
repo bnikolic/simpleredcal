@@ -29,7 +29,7 @@ import pandas as pd
 import numpy
 
 from fit_diagnostics import append_residuals_deg
-from red_likelihood import doDegVisVis
+from red_likelihood import doDegVisVis, red_ant_sep
 from red_utils import find_nearest, find_rel_df, find_zen_file, fn_format, \
 lst_to_jd_time, match_lst, mod_str_arg, new_fn, split_rel_results
 
@@ -108,9 +108,10 @@ def main():
     md_fn = 'rel_df.{}.{}.md.pkl'.format(args.jd_time, args.pol)
     with open(md_fn, 'rb') as f:
         md = pickle.load(f)
-    antpos = md['antpos']
+    ant_pos = md['antpos']
     no_unq_bls = md['no_unq_bls']
-    redg = md['redg']
+    RedG = md['redg']
+    ant_sep = red_ant_sep(RedG, ant_pos)
 
     pchans = args.chans
     if pchans is None:
@@ -235,7 +236,7 @@ def main():
                     rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
                     rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
 
-                    res_deg = doDegVisVis(redg, antpos, rel_vis1, rel_vis2, \
+                    res_deg = doDegVisVis(ant_sep, rel_vis1, rel_vis2, \
                                           distribution=args.dist, initp=initp)
                     res_deg = {key:res_deg[key] for key in slct_keys}
                     # expanding out the solution

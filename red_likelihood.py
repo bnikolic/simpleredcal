@@ -981,18 +981,14 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     return log_likelihood
 
 
-def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
+def doDegVisVis(ant_sep, rel_vis1, rel_vis2, distribution='cauchy', \
                 initp=None, max_nit=1000):
     """
     Fit degenerate redundant calibration parameters so that rel_vis1 is as
     close to as possible to rel_vis1
 
-    :param redg: Grouped baselines, as returned by groupBls. These should be the
-    same for datasets 1 and 2.
-    :type redg: ndarray
-    :param ant_pos: Dictionary of antenna position coordinates for the antennas
-    in ants
-    :type ant_pos: dict
+    :param ant_sep: Antenna seperation for baseline types
+    :type ant_sep: ndarray
     :param rel_vis1: Visibility solutions for observation set 1 for redundant
     baseline groups after relative calibration
     :param rel_vis1: ndarray
@@ -1015,7 +1011,6 @@ def doDegVisVis(redg, ant_pos, rel_vis1, rel_vis2, distribution='cauchy', \
         # set up initial params: overall amp, x and y phase gradients
         initp = np.asarray([1, 0, 0])
 
-    ant_sep = red_ant_sep(redg, ant_pos)
     ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
     res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
