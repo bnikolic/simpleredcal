@@ -182,7 +182,7 @@ def main():
             redundant visibilities)
             :type no_unq_bls: int
             :param no_ants: Number of antennas for given observation
-            :type ants: int
+            :type no_ants: int
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -216,7 +216,7 @@ def main():
             redundant visibilities)
             :type no_unq_bls: int
             :param no_ants: Number of antennas for given observation
-            :type ants: int
+            :type no_ants: int
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray

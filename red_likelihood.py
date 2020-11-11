@@ -403,7 +403,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     redundant visibilities)
     :type no_unq_bls: int
     :param no_ants: Number of antennas for given observation
-    :type ants: int
+    :type no_ants: int
     :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
     :type ref_ant_idx: int
@@ -641,7 +641,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     redundant visibilities)
     :type no_unq_bls: int
     :param no_ants: Number of antennas for given observation
-    :type ants: int
+    :type no_ants: int
     :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
     :type ref_ant_idx: int
