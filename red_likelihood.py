@@ -205,10 +205,10 @@ def red_ant_pos(redg, ant_pos):
     redundant sets. Dimensions are (baseline, (ant1, ant2), coordinates)
     :rtype: ndarray
     """
-    redbl_types = redblMap(redg)
-    redant_positions = np.array([np.array([ant_pos[i[1]], ant_pos[i[2]]]) \
-                       for i in redbl_types])
-    return redant_positions
+    red_bl_types = redblMap(redg)
+    red_ant_positions = np.array([np.array([ant_pos[i[1]], ant_pos[i[2]]]) \
+                       for i in red_bl_types])
+    return red_ant_positions
 
 
 def red_ant_sep(redg, ant_pos):
@@ -224,9 +224,9 @@ def red_ant_sep(redg, ant_pos):
     :return: Array of seperations of the baselines that define the redundant sets
     :rtype: ndarray
     """
-    redant_positions = red_ant_pos(redg, ant_pos)
-    redant_seperation = redant_positions[:, 0, :] - redant_positions[:, 1, :]
-    return redant_seperation
+    red_ant_positions = red_ant_pos(redg, ant_pos)
+    red_ant_seperation = red_ant_positions[:, 0, :] - red_ant_positions[:, 1, :]
+    return red_ant_seperation
 
 
 def decomposeCArray(arr):
@@ -320,6 +320,24 @@ def norm_rel_sols(resx, no_unq_bls, coords='cartesian'):
         raise ValueError('Specify a correct coordinate system: {"cartesian", \
                          "polar"}')
     return np.hstack([vis_params, gain_params])
+
+
+def flt_ant_pos(ant_pos, ants):
+    """Filters antenna positions dictionary from HERAData container by good
+    antennas, sorts them, and returns ndarray of shape (no_ants, 3)
+
+    :param ant_pos: Dictionary of antenna position coordinates for the antennas
+    in ants
+    :type ant_pos: dict
+    :param ants: Good antennas
+    :type ants: list
+
+    :return: Filtered and sorted antenna positions
+    :rtype: ndarray
+    """
+    flt_ant_pos_dict = dict(sorted({a: p for a, p in ant_pos.items() if a in ants}.items()))
+    flt_ant_pos_arr = numpy.asarray(list(flt_ant_pos_dict.values()))
+    return flt_ant_pos_arr
 
 
 @jit
@@ -742,7 +760,7 @@ def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     return w_alpha
 
 
-def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, params):
+def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, params):
     """Optimal likelihood calculator
 
     We solve for the degeneracies in redundant calibration. This must be done
@@ -770,7 +788,6 @@ def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: float
      """
-    no_ants = credg[:, 1:].max().item() + 1
     rel_gains_comps, deg_params = np.split(params, [2*no_ants,])
     rel_gains = makeEArray(rel_gains_comps)
 
@@ -788,27 +805,24 @@ class Opt_Constraints:
     of normalized gains, overall_amplitude, overall phase, phase gradient x and
     phase gradient y, in tha order.
 
-    :param ants: Antenna numbers dealt with in visibility dataset
-    :type ants: ndarray
-    :param ref_ant: Antenna number of reference antenna to constrain overall phase
-    :type ref_ant: int
-    :param ant_pos: Dictionary of antenna position coordinates for the antennas
-    in ants
-    :type ant_pos: dict
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param no_ants: Number of antennas for given observation
+    :type no_ants: int
+    :param ref_ant_idx: Index of reference antenna in ordered list of antennas to
+    constrain overall phase. Default is 16 (corresponding to antenna 55 in H1C_IDR2
+    dataset).
+    :type ref_ant_idx: int
+    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    in ants. See flt_ant_pos.
+    :type ant_pos: ndarray
     :param params: Parameters to feed into optimal absolute calibration
     :type params: ndarray
     """
-    def __init__(self, ants, ref_ant, ant_pos, redg):
-        self.ants = ants
-        self.ref_ant = ref_ant
+    def __init__(self, no_ants, ref_ant_idx, ant_pos):
+        self.no_ants = no_ants
+        self.ref_ant_idx = ref_ant_idx
         self.ant_pos = ant_pos
-        self.redg = redg
-        self.ref_ant_idx = condenseMap(self.ants)[self.ref_ant]
-        self.cmap = condenseMap(self.redg[:, 1:3])
-        self.x_pos = np.asarray([self.ant_pos[ant_no][0] for ant_no in self.cmap.keys()])
-        self.y_pos = np.asarray([self.ant_pos[ant_no][1] for ant_no in self.cmap.keys()])
+        self.x_pos = ant_pos[:, 0]
+        self.y_pos = ant_pos[:, 1]
 
     def avg_amp(self, params):
         """Constraint that mean of gain amplitudes must be equal to 1
@@ -816,7 +830,7 @@ class Opt_Constraints:
         :return: Residual between mean gain amplitudes and 1
         :rtype: float
         """
-        amps = params[:self.ants.size*2:2]
+        amps = params[:self.no_ants*2:2]
         return np.mean(amps) - 1
 
     def avg_phase(self, params):
@@ -825,7 +839,7 @@ class Opt_Constraints:
         :return: Residual between mean of gain phases and 0
         :rtype: float
         """
-        phases = params[1:self.ants.size*2:2]
+        phases = params[1:self.no_ants*2:2]
         return np.mean(phases)
 
     def ref_phase(self, params):
@@ -834,7 +848,7 @@ class Opt_Constraints:
         :return: Residual between reference antenna phase and 0
         :rtype: float
         """
-        phases = params[1:self.ants.size*2:2]
+        phases = params[1:self.no_ants*2:2]
         return phases[self.ref_ant_idx]
 
     def ref_amp(self, params):
@@ -843,7 +857,7 @@ class Opt_Constraints:
         :return: Residual between reference antenna amplitude and 1
         :rtype: float
         """
-        amps = params[:self.ants.size*2:2]
+        amps = params[:self.no_ants*2:2]
         return amps[self.ref_ant_idx] - 1
 
     def phase_grad_x(self, params):
@@ -852,7 +866,7 @@ class Opt_Constraints:
         :return: Residual between phase gradient in x and 0
         :rtype: float
         """
-        phases = params[1:self.ants.size*2:2]
+        phases = params[1:self.no_ants*2:2]
         return np.sum(phases*self.x_pos)
 
     def phase_grad_y(self, params):
@@ -861,32 +875,39 @@ class Opt_Constraints:
         :return: Residual between phase gradient in y and 0
         :rtype: float
         """
-        phases = params[1:self.ants.size*2:2]
+        phases = params[1:self.no_ants*2:2]
         return np.sum(phases*self.y_pos)
 
 
-def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, \
-             initp=None, max_nit=1000):
+def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='cauchy', \
+             ref_ant_idx=16, initp=None, max_nit=1000):
     """Do optimal absolute step of redundant calibration
 
     Initial degenerate parameter guesses are 1 for the overall amplitude, and 0
     for the overall phase and the phase gradients in x and y.
 
-    :param redg: Grouped baselines, as returned by groupBls
-    :type redg: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with redg
     :type obsvis: ndarray
-    :param ant_pos: Dictionary of antenna position coordinates for the antennas
-    in ants
-    :type ant_pos: dict
+    :param no_ants: Number of antennas for given observation
+    :type no_ants: int
+    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    in ants. See flt_ant_pos.
+    :type ant_pos: ndarray
+    :param ant_sep: Antenna seperation for baseline types. See red_ant_sep.
+    :type ant_sep: ndarray
     :param rel_vis: Visibility solutions for redundant baseline groups after
     relative calibration
     :param rel_vis: ndarray
     :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
     :type distribution: str
-    :param ref_ant: Antenna number of reference antenna to constrain overall phase
-    :type ref_ant: int
+    :param ref_ant_idx: Index of reference antenna in ordered list of antennas to
+    constrain overall phase. Default is 16 (corresponding to antenna 55 in H1C_IDR2
+    dataset).
+    :type ref_ant_idx: int
     :param initp: Initial parameter guesses for gains and degenerate parameters
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
@@ -896,11 +917,10 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
     redundant gains and degenerate parameters
     :rtype: Scipy optimization result object
     """
-    ants = numpy.unique(redg[:, 1:])
     if initp is None:
         # set up initial parameters
-        xgamps = np.ones(ants.size) # gain amplitudes
-        xgphases = np.zeros(ants.size) # gain phases
+        xgamps = np.ones(no_ants) # gain amplitudes
+        xgphases = np.zeros(no_ants) # gain phases
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         xdegparams = np.zeros(4) # overall amplitude, overall phase,
         # and phase gradients in x and y
@@ -908,12 +928,12 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
 
     lb = numpy.repeat(-np.inf, initp.size)
     ub = numpy.repeat(np.inf, initp.size)
-    lb[:ants.size*2:2] = 0 # lower bound for gain amplitudes
+    lb[:no_ants*2:2] = 0 # lower bound for gain amplitudes
     lb[-4] = 0 # lower bound for overall amplitude
     bounds = Bounds(lb, ub)
 
     # constraints for optimization
-    constraints = Opt_Constraints(ants, ref_ant, ant_pos, redg)
+    constraints = Opt_Constraints(no_ants, ref_ant_idx, ant_pos)
     cons = [{'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},
             {'type': 'eq', 'fun': constraints.ref_phase},
@@ -922,9 +942,8 @@ def doOptCal(redg, obsvis, ant_pos, rel_vis, distribution='cauchy', ref_ant=12, 
             {'type': 'eq', 'fun': constraints.phase_grad_y}
             ]
 
-    ant_sep = red_ant_sep(redg, ant_pos)
-    ff = jit(functools.partial(optimal_logLkl, relabelAnts(redg), distribution, \
-                               ant_sep, obsvis, rel_vis))
+    ff = jit(functools.partial(optimal_logLkl, credg, distribution, \
+                               ant_sep, obsvis, rel_vis, no_ants))
     res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
                    constraints=cons, bounds=bounds, method='trust-constr', \
                    options={'maxiter':max_nit})

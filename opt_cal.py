@@ -29,8 +29,8 @@ import pandas as pd
 import numpy
 
 from fit_diagnostics import append_residuals_opt
-from red_likelihood import decomposeCArray, degVis, doOptCal, group_data, \
-red_ant_sep, relabelAnts
+from red_likelihood import decomposeCArray, degVis, doOptCal, flt_ant_pos, \
+group_data, red_ant_sep, relabelAnts
 from red_utils import find_nearest, find_flag_file, find_rel_df, find_zen_file, \
 fn_format, get_bad_ants, mod_str_arg, new_fn, split_rel_results
 
@@ -61,8 +61,8 @@ def main():
     parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
-    parser.add_argument('-a', '--ref_ant', required=False, default=85, metavar='A', \
-                        type=int, help='Reference antenna to set the overall \
+    parser.add_argument('-a', '--ref_ant_idx', required=False, default=16, metavar='A', \
+                        type=int, help='Reference antenna index to set the overall \
                         phase')
     parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
                         type=str, help='Directory in which relative calibration \
@@ -164,8 +164,10 @@ def main():
         flags = cData.mask
         cData = cData.data
 
-        no_ants = numpy.unique(RedG[:, 1:]).size
+        ants = numpy.unique(RedG[:, 1:])
+        no_ants = ants.size
         no_unq_bls = numpy.unique(RedG[:, 0]).size
+        cRedG = relabelAnts(RedG)
 
         # removing 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
@@ -173,7 +175,9 @@ def main():
         psize = no_ants*2 + no_deg_params + no_unq_bls*2
         header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
+        ant_pos = flt_ant_pos(hd.antpos, ants)
         ant_sep = red_ant_sep(RedG, hd.antpos)
+
         def get_w_alpha(res_rel_vis, new_deg_params):
             """Apply degenerate parameters found from optimal absolute
             calibration to visibility solutions from relative redundant
@@ -202,9 +206,9 @@ def main():
                     rel_idim = (freq_chans[iter_dim[0]], time_ints[iter_dim[1]])
                     res_rel_vis, _ = split_rel_results(rel_df.loc[rel_idim]\
                         [len(slct_keys)-1:-2].values.astype(float), no_unq_bls)
-                    res_opt = doOptCal(RedG, cData[iter_dim], hd.antpos, \
-                        res_rel_vis, distribution=args.dist, ref_ant=args.ref_ant, \
-                        initp=initp)
+                    res_opt = doOptCal(cRedG, cData[iter_dim], no_ants, ant_pos, \
+                                       ant_sep, res_rel_vis, distribution=args.dist, \
+                                       ref_ant_idx=args.ref_ant_idx, initp=initp)
                     res_opt = {key:res_opt[key] for key in slct_keys}
                     # get the new visibility solutions
                     w_alpha = get_w_alpha(res_rel_vis, res_opt['x'][-no_deg_params:])
@@ -228,7 +232,7 @@ def main():
               .format(out_csv))
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
-        df = append_residuals_opt(df, cData, relabelAnts(RedG), out_fn=None)
+        df = append_residuals_opt(df, cData, cRedG, out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
