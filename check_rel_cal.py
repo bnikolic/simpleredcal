@@ -17,7 +17,7 @@ import pandas as pd
 import numpy
 
 from fit_diagnostics import norm_residuals
-from red_likelihood import doRelCal, group_data, norm_rel_sols
+from red_likelihood import doRelCal, group_data, norm_rel_sols, relabelAnts
 from red_utils import find_zen_file, fn_format, get_bad_ants, new_fn, \
 split_rel_results
 
@@ -108,6 +108,7 @@ def main():
         # to get fields for the csv header
         no_ants = numpy.unique(RedG[:, 1:]).size
         no_unq_bls = numpy.unique(RedG[:, 0]).size
+        cRedG = relabelAnts(RedG)
         psize = (no_ants + no_unq_bls)*2
 
         indices = ['freq', 'time_int']
@@ -120,9 +121,8 @@ def main():
                 writer = DictWriter(f, fieldnames=header)
                 writer.writeheader()
                 for iter_dim in rnd_idxs:
-                    print(iter_dim)
-                    res_rel = doRelCal(RedG, cData[fmap[iter_dim[0]], iter_dim[1]], \
-                                       distribution=dist)
+                    res_rel = doRelCal(cRedG, cData[fmap[iter_dim[0]], iter_dim[1]], \
+                                       no_unq_bls, no_ants, distribution=dist)
                     res_rel = {key:res_rel[key] for key in slct_keys}
                     res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
 
