@@ -341,7 +341,9 @@ def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None,
     ax = sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax)
     if xbase is not None:
         ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
-    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(-df.columns.values[0]))
+    xoffset = df.columns.values[0]
+    if xoffset != 1:
+        ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-df.columns.values[0]))
     if ybase is not None:
         ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
         ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
