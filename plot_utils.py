@@ -32,6 +32,7 @@ def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     ax.grid(False)
     ax.set_xlabel('Baseline ID')
     ax.set_ylabel('Time Integration')
+    plt.tight_layout()
     plt.show()
 
 
@@ -70,6 +71,7 @@ def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
         plt.savefig('{}/vis.png'.format(save_dir))
+    plt.tight_layout()
     plt.show()
 
 
@@ -141,6 +143,7 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
         ylabel = ylab_dict[col]
     ax.set_ylabel((ylog+ylabel).capitalize())
     ax.set_title(title)
+    plt.tight_layout()
     plt.show()
 
 
@@ -178,6 +181,7 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
         ylabel = ylab_dict[col]
     ax.set_ylabel((ylog+ylabel).capitalize())
     plt.legend()
+    plt.tight_layout()
     plt.show()
 
     if ylabel == '':
@@ -210,8 +214,8 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     :type clip: bool
     :param clip_pctile: Percentile to clip the data
     :type clip_pctile: int, float
-    :param vmax: Minimum value of heatmap
-    :type vmax: float
+    :param vmin: Minimum value of heatmap
+    :type vmin: float
     :param vmax: Maximum value of heatmap
     :type vmax: float
     :param center: Value at which to center the colourmap
@@ -304,6 +308,50 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     return fig, ax
 
 
+def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None, \
+               center=None, vmin=None, vmax=None, cmap=sns.cm.rocket_r, figsize=(11, 7)):
+    """Plots heatmap of visibility-related data, with vmax set as a percentile
+    of the dataframe
+
+    :param df: Dataframe to be plotted
+    :type df: DataFrame
+    :param xlabel: xlabel of the plot
+    :type xlabel: str
+    :param ylabel: ylabel of the plot
+    :type ylabel: str
+    :param title: title of the plot
+    :type ylabel: str
+    :param xbase: x axis limits and tickets are multiples of this value
+    :type xbase: int
+    :param ybase: x axis limits and tickets are multiples of this value
+    :type ybase: int
+    :param center: Value at which to center the colourmap
+    :type center: float
+    :param vmin: Minimum value of heatmap
+    :type vmin: float
+    :param vmax: Maximum value of heatmap
+    :type vmax: float
+    :param cmap: Colour mapping from data values to colour space
+    :type cmap: str, matplotlib colormap name or object, list
+    :param figsize: Figure size of plot
+    :type figsize: tuple
+    """
+
+    fig, ax = plt.subplots(figsize=(11, 7))
+    ax = sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax)
+    if xbase is not None:
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(-df.columns.values[0]))
+    if ybase is not None:
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
+        ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.show()
+
+
 def antpos_map(values, antpos, title=None, std_rng=2, center=None, \
                cmap='bwr', figsize=(10, 8)):
     """Scatter plot of values attributed to antennas, according to their
@@ -355,3 +403,4 @@ def antpos_map(values, antpos, title=None, std_rng=2, center=None, \
     ax.axis('equal')
     fig.colorbar(im, ax=ax)
     plt.tight_layout()
+    plt.show()
