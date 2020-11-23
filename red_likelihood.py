@@ -883,8 +883,8 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
              ref_ant_idx=16, initp=None, max_nit=1000):
     """Do optimal absolute step of redundant calibration
 
-    Initial degenerate parameter guesses are 1 for the overall amplitude, and 0
-    for the overall phase and the phase gradients in x and y.
+    Initial degenerate parameter guesses are 0 for the overall amplitude,
+    overall phase and the phase gradients in x and y.
 
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
