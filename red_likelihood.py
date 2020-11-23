@@ -577,7 +577,7 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
     if amp_constr == 'prod':
         gampref = 1/gamps.prod() # constraint that the product of amps is 1
     elif amp_constr == 'mean':
-        gampref = 1 + gamps.size - gamps.sum() # constraint that the sum of amps is 1
+        gampref = gamps.size - gamps.sum() # constraint that the mean of amps is 1
     else:
         raise ValueError('Specify a correct gain amplitude constraint: \
                          {"prod", "mean"}')
@@ -709,7 +709,10 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
         if bounded:
             lb = numpy.repeat(-np.inf, initp.size)
             ub = numpy.repeat(np.inf, initp.size)
-            lb[:2*(no_unq_bls+no_ants-1):2] = 0 # lower bound for gain and vis amplitudes
+            lb[:2*(no_unq_bls):2] = 0 # lower bound for gain amps
+            # lb[:2*(no_unq_bls+no_ants-1):2] = 0 # lower bound for gain and
+            # vis amps - vis amp boundary found to be unnecessary and minimization
+            # takes longer
             bounds = Bounds(lb, ub)
             # method = 'L-BFGS-B' # get b'ABNORMAL_TERMINATION_IN_LNSRCH'
             # jac = lambda x: numpy.array(jacrev(ff)(x))
