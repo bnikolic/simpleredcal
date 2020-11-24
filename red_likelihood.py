@@ -364,7 +364,8 @@ LLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
 makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
 
-def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
+def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
+                    params):
     """Redundant relative likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -387,6 +388,9 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
     :param coords: Coordinate system in which gain and visibility parameters
     have been set up
     :type coords: str {"cartesian", "polar"}
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned. Only if coords=="polar".
+    :type logamp: bool
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im [cartesian] or Amp & Phase [polar] components interweaved for both)
     :type params: ndarray
@@ -394,9 +398,14 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
     :return: Negative log-likelihood of MLE computation
     :rtype: float
     """
-    vis_comps, gains_comps = np.split(params, [no_unq_bls*2, ])
+    vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
+    if logamp:
+        # transforming gain amplitudes to force positive results
+        gamps = np.exp(gain_comps[::2])
+        gphases = gain_comps[1::2]
+        gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
     vis = makeC[coords](vis_comps)
-    gains = makeC[coords](gains_comps)
+    gains = makeC[coords](gain_comps)
 
     delta = obsvis - gVis(vis, credg, gains)
     log_likelihood = LLFN[distribution](delta)
@@ -404,7 +413,7 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, params):
 
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
-             bounded=False, initp=None, norm_gains=False, max_nit=1000, \
+             bounded=False, logamp=False, initp=None, norm_gains=False, max_nit=1000, \
              jax_minimizer=False):
     """Do relative step of redundant calibration
 
@@ -422,9 +431,6 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :type no_unq_bls: int
     :param no_ants: Number of antennas for given observation
     :type no_ants: int
-    :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
-    Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
-    :type ref_ant_idx: int
     :param coords: Coordinate system in which gain and visibility parameters
     have been set up
     :type coords: str {"cartesian", "polar"}
@@ -433,6 +439,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :param bounded: Bounded optimization, where the amplitudes for the visibilities
     and the gains must be > 0. 'trust-constr' method used.
     :type bounded: bool
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned. Only if coords=="polar".
+    :type logamp: bool
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
     :param norm_gains: Normalize result gain amplitudes such that their mean is 1
@@ -452,10 +461,15 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             xvis = np.zeros(no_unq_bls*2) # complex vis
             xgains = np.ones(no_ants*2) # complex gains
         elif coords == 'polar': # (Amp & Phase components)
-            xvamps = np.zeros(no_unq_bls) # vis amplitudes
-            xvphases = np.zeros(no_unq_bls) # vis phases
-            xgamps = np.ones(no_ants) # gain amplitudes
-            xgphases = np.zeros(no_ants) # gain phases
+            xvphases = np.zeros(no_unq_bls)
+            xgphases = np.zeros(no_ants)
+            xvamps = np.ones(no_unq_bls)
+            if logamp:
+                xgamps = np.zeros(no_ants)
+                if bounded:
+                    print('Disregarding bounded argument in favour of logamp approach')
+            else:
+                xgamps = np.ones(no_ants)
             xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
             xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         else:
@@ -464,22 +478,18 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
         initp = np.hstack([xvis, xgains])
 
     ff = jit(functools.partial(relative_logLkl, credg, distribution, obsvis, \
-                               no_unq_bls, coords))
+                               no_unq_bls, coords, logamp))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
               ._asdict()
         print('status: {}'.format(res['status']))
     else:
-        if bounded and coords == 'polar':
+        if bounded and coords == 'polar' and not logamp:
             lb = numpy.repeat(-np.inf, initp.size)
             ub = numpy.repeat(np.inf, initp.size)
-            lb[::2] = 0 # lower bound for gain and vis amplitudes
+            lb[-2*no_ants::2] = 0 # lower bound for gain amplitudes
             bounds = Bounds(lb, ub)
-            # method = 'L-BFGS-B' # some gain amplitudes = 0 with this method...
-            # hess = None
-            # jac = lambda x: numpy.array(jacrev(ff)(x))
-            # max_nit = max(10000, max_nit)
             method = 'trust-constr'
             hess = jacfwd(jacrev(ff))
             jac = None
@@ -491,6 +501,13 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
         res = minimize(ff, initp, bounds=bounds, method=method, \
                        jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
+    if logamp and coords == 'polar':
+        # transforming gain amplitudes back
+        vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
+        gamps = np.exp(gain_comps[::2])
+        gphases = gain_comps[1::2]
+        gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+        res['x'] = numpy.array(np.hstack([vis_comps, gain_comps]))
     if norm_gains:
         if coords == 'polar' and (res['x'][-2*no_ants::2] < 0).any():
             print('Relative calibration solutions were not normalized, as some '\
@@ -972,8 +989,8 @@ def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, param
     :return: Negative log-likelihood of MLE computation
     :rtype: float
      """
-    rel_gains_comps, deg_params = np.split(params, [2*no_ants,])
-    rel_gains = makeEArray(rel_gains_comps)
+    rel_gain_comps, deg_params = np.split(params, [2*no_ants,])
+    rel_gains = makeEArray(rel_gain_comps)
 
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
     delta = obsvis - gVis(w_alpha, credg, rel_gains)
