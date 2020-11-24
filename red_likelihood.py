@@ -577,7 +577,7 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
     if amp_constr == 'prod':
         gampref = 1/gamps.prod() # constraint that the product of amps is 1
     elif amp_constr == 'mean':
-        gampref = gamps.size - gamps.sum() # constraint that the mean of amps is 1
+        gampref = gamps.size + 1 - gamps.sum() # constraint that the mean of amps is 1
     else:
         raise ValueError('Specify a correct gain amplitude constraint: \
                          {"prod", "mean"}')
@@ -733,6 +733,187 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx, \
                                               constr_phase, amp_constr)])
+    return res, initp
+
+
+def set_grefT(gain_comps, mphase_ref_ant_idx, ophase_ref_ant_idx, \
+              ant_pos, amp_constr):
+    """Return gain components with reference gain included, constrained to be
+    such that the product of all gain amplitudes is 1, the mean of all gain
+    phases is 0 and that the tilts are 0
+
+    :param gain_comps: Interweaved polar gain components without reference gain
+    :type gain_comps: ndarray
+    :param mphase_ref_ant_idx: Index of reference antenna that sets the mean of
+    the gan phases to 0 in ordered list of antennas.
+    Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
+    :type mphase_ref_ant_idx: int
+    :param ophase_ref_ant_idx: Index of reference antenna that sets the overall
+    phase to 0 in ordered list of antennas.
+    Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
+    :type ophase_ref_ant_idx: int
+    :param amp_constr: Constraint to apply to gain amplitudes: either the
+    {"prod", "mean"} of gain amplitudes = 1
+    :type amp_constr: str
+
+    :return: Interweaved polar gain components with reference gain included
+    :rtype: ndarray
+    """
+    assert ophase_ref_ant_idx > mphase_ref_ant_idx, 'Ensure the index of the '\
+    'referance antenna that sets the overall phase is higher than that which sets '\
+    'the mean phase'
+    gamps = np.log(gain_comps[::2])
+    gphases = gain_comps[1::2]
+    gamp1, gamp2 = np.split(gamps, [mphase_ref_ant_idx])
+    gphase1, gphase2, gphase3 = np.split(gphases, [mphase_ref_ant_idx, \
+                                         ophase_ref_ant_idx])
+    # set reference gain constraints
+    if amp_constr == 'prod':
+        gampref = 1/gamps.prod() # constraint that the product of amps is 1
+    elif amp_constr == 'mean':
+        gampref = gamps.size + 1 - gamps.sum() # constraint that the mean of amps is 1
+    else:
+        raise ValueError('Specify a correct gain amplitude constraint: \
+                         {"prod", "mean"}')
+
+    mgphaseref = -gphases.sum() # constraint that the mean phase is 0
+    ogphaseref = 0 # set the phase of the reference antenna to be 0 (overall phase)
+    # ant_pos_rest1 = np.vstack((ant_pos[:ophase_ref_ant_idx, :], \
+    #                            ant_pos[ophase_ref_ant_idx+1:, :]))
+    # ant_pos_rest2 = np.vstack((ant_pos_rest1[:mphase_ref_ant_idx, :], \
+    #                            ant_pos_rest1[mphase_ref_ant_idx+1:, :]))
+    # ogphaseref = 1/(ant_pos[ophase_ref_ant_idx, 0] + ant_pos[ophase_ref_ant_idx, 1]) \
+    #     * np.sum((ant_pos_rest2[:, 0] + ant_pos_rest2[:, 1]) * gphases) # set the tilt to be zero
+    gamps = np.hstack([gamp1, gampref, gamp2])
+    gphases = np.hstack([gphase1, mgphaseref, gphase2, ogphaseref, gphase3])
+    gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+    return gain_comps
+
+
+def relative_logLklRPT(credg, distribution, obsvis, mphase_ref_ant_idx, \
+                       ophase_ref_ant_idx, ant_pos, no_unq_bls, amp_constr, \
+                       params):
+    """Redundant relative likelihood calculator
+
+    *Polar coordinates with gain, phase and tilt constraints*
+
+    We impose that the true sky visibilities from redundant baseline sets are
+    equal, and use this prior to calibrate the visibilities (up to some degenerate
+    parameters). We set the noise for each visibility to be 1.
+
+    Note: parameter order is such that the function can be usefully partially applied.
+
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
+    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :type distribution: str
+    :param obsvis: Observed sky visibilities for a given frequency and given time,
+    reformatted to have format consistent with credg
+    :type obsvis: ndarray
+    :param mphase_ref_ant_idx: Index of reference antenna that sets the mean of
+    the gan phases to 0 in ordered list of antennas.
+    Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
+    :type mphase_ref_ant_idx: int
+    :param ophase_ref_ant_idx: Index of reference antenna that sets the overall
+    phase to 0 in ordered list of antennas.
+    Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
+    :type ophase_ref_ant_idx: int
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param amp_constr: Constraint to apply to gain amplitudes: either the
+    {"prod", "mean"} of gain amplitudes = 1
+    :type amp_constr: str
+    :param params: Parameters to constrain - redundant visibilities and gains
+    (Amp & Phase components interweaved for both)
+    :type params: ndarray
+
+    :return: Negative log-likelihood of MLE computation
+    :rtype: float
+    """
+    vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
+    vis = makeEArray(vis_comps)
+    gain_comps = set_grefT(gain_comps, mphase_ref_ant_idx, \
+                           ophase_ref_ant_idx, ant_pos, amp_constr)
+    gphases = gain_comps[1::2]
+    gains = makeEArray(gain_comps)
+    delta = obsvis - gVis(vis, credg, gains)
+    log_likelihood = LLFN[distribution](delta)
+    return log_likelihood + (np.square(np.sum(ant_pos[:, 0]*gphases)) + np.square(np.sum(ant_pos[:, 1]*gphases)))/(np.pi/180)
+
+
+def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauchy', \
+                mphase_ref_ant_idx=16, ophase_ref_ant_idx=25, amp_constr='prod', \
+                bounded=False, initp=None, max_nit=1000):
+    """Do relative step of redundant calibration
+
+    *Polar coordinates with implicit constraints that include mean gain amplitude,
+    mean gain phase, and overall phase. Regularization term added to constrain the
+    tilts.*
+
+    Initial parameter guesses, if not specified, are 1*e(0j) and 0*e(0j) for
+    the gains and the true sky visibilities.
+
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
+    :param obsvis: Observed sky visibilities for a given frequency and given time,
+    reformatted to have format consistent with redg
+    :type obsvis: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param no_ants: Number of antennas for given observation
+    :type no_ants: int
+    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :type distribution: str
+    :param mphase_ref_ant_idx: Index of reference antenna that sets the mean of
+    the gan phases to 0 in ordered list of antennas.
+    Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
+    :type mphase_ref_ant_idx: int
+    :param ophase_ref_ant_idx: Index of reference antenna that sets the overall
+    phase to 0 in ordered list of antennas.
+    Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
+    :type ophase_ref_ant_idx: int
+    :param amp_constr: Constraint to apply to gain amplitudes: either the
+    {"prod", "mean"} of gain amplitudes = 1
+    :type amp_constr: str
+    :param bounded: Bounded optimization, where the amplitudes for the visibilities
+    and the gains must be > 0. 'trust-constr' method used.
+    :type bounded: bool
+    :param initp: Initial parameter guesses for true visibilities and gains
+    :type initp: ndarray, None
+    :param max_nit: Maximum number of iterations to perform
+    :type max_nit: int
+
+    :return: Optimization result for the solved antenna gains and true sky
+    visibilities
+    :rtype: Scipy optimization result object
+    """
+    if initp is None:
+        # set up initial parameters
+        xvamps = np.zeros(no_unq_bls) # vis amplitudes
+        xvphases = np.zeros(no_unq_bls) # vis phases
+        xgamps = np.repeat(np.e, no_ants-2) # e^gain amplitudes (to force positive)
+        xgphases = np.zeros(no_ants-2) # gain phases
+        xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
+        xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
+        initp = np.hstack([xvis, xgains])
+        initp = np.append(initp, np.array([np.e])) # Adding back a gain amplitude
+
+    ff = jit(functools.partial(relative_logLklRPT, credg, distribution, obsvis, \
+                               mphase_ref_ant_idx, ophase_ref_ant_idx, ant_pos, \
+                               no_unq_bls, amp_constr))
+
+    res = minimize(ff, initp, bounds=None, method='BFGS', \
+                   jac=jacrev(ff), options={'maxiter':max_nit})
+    print(res['message'])
+    initp = numpy.copy(res['x']) # to reuse parameters
+    vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
+    res['x'] = np.hstack([vis_comps, set_grefT(gain_comps, mphase_ref_ant_idx, \
+                                               ophase_ref_ant_idx, ant_pos, \
+                                               amp_constr)])
     return res, initp
 
 
