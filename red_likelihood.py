@@ -358,15 +358,16 @@ def gVis(vis, credg, gains):
     return vis[credg[:, 0]]*gains[credg[:, 1]]*np.conj(gains[credg[:, 2]])
 
 
-LLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
-        'gaussian':lambda delta: np.square(np.abs(delta)).sum()}
+# Negative log-likelihood calculation
+NLLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
+         'gaussian':lambda delta: np.square(np.abs(delta)).sum()}
 
 makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
 
-def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
+def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
                     params):
-    """Redundant relative likelihood calculator
+    """Redundant relative negative log-likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
     equal, and use this prior to calibrate the visibilities (up to some degenerate
@@ -377,7 +378,8 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
     :type credg: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with credg
@@ -408,8 +410,8 @@ def relative_logLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     gains = makeC[coords](gain_comps)
 
     delta = obsvis - gVis(vis, credg, gains)
-    log_likelihood = LLFN[distribution](delta)
-    return log_likelihood
+    nlog_likelihood = NLLFN[distribution](delta)
+    return nlog_likelihood
 
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
@@ -434,7 +436,8 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :param coords: Coordinate system in which gain and visibility parameters
     have been set up
     :type coords: str {"cartesian", "polar"}
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param bounded: Bounded optimization, where the amplitudes for the visibilities
     and the gains must be > 0. 'trust-constr' method used.
@@ -461,15 +464,15 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             xvis = np.zeros(no_unq_bls*2) # complex vis
             xgains = np.ones(no_ants*2) # complex gains
         elif coords == 'polar': # (Amp & Phase components)
-            xvphases = np.zeros(no_unq_bls)
-            xgphases = np.zeros(no_ants)
             xvamps = np.ones(no_unq_bls)
+            xvphases = np.zeros(no_unq_bls)
             if logamp:
                 xgamps = np.zeros(no_ants)
                 if bounded:
                     print('Disregarding bounded argument in favour of logamp approach')
             else:
                 xgamps = np.ones(no_ants)
+            xgphases = np.zeros(no_ants)
             xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
             xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         else:
@@ -477,7 +480,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                              "polar"}')
         initp = np.hstack([xvis, xgains])
 
-    ff = jit(functools.partial(relative_logLkl, credg, distribution, obsvis, \
+    ff = jit(functools.partial(relative_nlogLkl, credg, distribution, obsvis, \
                                no_unq_bls, coords, logamp))
 
     if jax_minimizer and not bounded:
@@ -562,7 +565,7 @@ def rotate_phase(rel_resx, no_unq_bls, principle_angle=False, norm_gains=False):
     return new_res_relx
 
 
-def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
+def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr, logamp):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1 and the mean of all gain
     phases is 0
@@ -576,6 +579,9 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
     :param amp_constr: Constraint to apply to gain amplitudes: either the
     {"prod", "mean"} of gain amplitudes = 1
     :type amp_constr: str
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned. Only if coords=="polar".
+    :type logamp: bool
 
     :return: Interweaved polar gain components with reference gain included
     :rtype: ndarray
@@ -587,14 +593,17 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
     else:
         gamps = gain_comps[:-1:2]
         gphaseref = gain_comps[-1]
+    if logamp:
+        # transforming gain amplitudes to force positive results
+        gamps = np.exp(gamps)
     gphases = gain_comps[1::2]
     gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
     gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
     # set reference gain constraints
     if amp_constr == 'prod':
-        gampref = 1/gamps.prod() # constraint that the product of amps is 1
+        gampref = 1/gamps.prod() # ensure that product of amps is 1
     elif amp_constr == 'mean':
-        gampref = gamps.size + 1 - gamps.sum() # constraint that the mean of amps is 1
+        gampref = gamps.size + 1 - gamps.sum() # ensure that mean of amps is 1
     else:
         raise ValueError('Specify a correct gain amplitude constraint: \
                          {"prod", "mean"}')
@@ -608,8 +617,8 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr):
     return gain_comps
 
 
-def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
-                      constr_phase, amp_constr, params):
+def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
+                      constr_phase, amp_constr, logamp, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain constraints*
@@ -623,7 +632,8 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
     :type credg: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with credg
@@ -638,6 +648,9 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :param amp_constr: Constraint to apply to gain amplitudes: either the
     {"prod", "mean"} of gain amplitudes = 1
     :type amp_constr: str
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned. Only if coords=="polar".
+    :type logamp: bool
     :param params: Parameters to constrain - redundant visibilities and gains
     (Amp & Phase components interweaved for both)
     :type params: ndarray
@@ -646,19 +659,18 @@ def relative_logLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :rtype: float
     """
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
-
     vis = makeEArray(vis_comps)
     gains = makeEArray(set_gref(gain_comps, ref_ant_idx, constr_phase, \
-                                amp_constr))
+                                amp_constr, logamp))
 
     delta = obsvis - gVis(vis, credg, gains)
-    log_likelihood = LLFN[distribution](delta)
-    return log_likelihood
+    nlog_likelihood = NLLFN[distribution](delta)
+    return nlog_likelihood
 
 
 def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_ant_idx=16, \
-               constr_phase=False, amp_constr='prod', bounded=False, initp=None, \
-               max_nit=1000, jax_minimizer=False):
+               constr_phase=False, amp_constr='prod', bounded=False, logamp=False, \
+               initp=None, max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -680,7 +692,8 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
     :type ref_ant_idx: int
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
     :type constr_phase: bool
@@ -690,6 +703,9 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     :param bounded: Bounded optimization, where the amplitudes for the visibilities
     and the gains must be > 0. 'trust-constr' method used.
     :type bounded: bool
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned. Only if coords=="polar".
+    :type logamp: bool
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
@@ -706,7 +722,12 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
         # reference antenna gain not included in the initial parameters
         xvamps = np.zeros(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
-        xgamps = np.ones(no_ants-1) # gain amplitudes
+        if logamp:
+            xgamps = np.zeros(no_ants-1)
+            if bounded:
+                print('Disregarding bounded argument in favour of logamp approach')
+        else:
+            xgamps = np.ones(no_ants-1)
         xgphases = np.zeros(no_ants-1) # gain phases
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
@@ -714,16 +735,16 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
         if not constr_phase:
             initp = np.append(initp, np.array([0]))
 
-    ff = jit(functools.partial(relative_logLklRP, credg, \
+    ff = jit(functools.partial(relative_nlogLklRP, credg, \
              distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase, \
-             amp_constr))
+             amp_constr, logamp))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
               ._asdict()
         print('status: {}'.format(res['status']))
     else:
-        if bounded:
+        if bounded and not logamp:
             lb = numpy.repeat(-np.inf, initp.size)
             ub = numpy.repeat(np.inf, initp.size)
             lb[:2*(no_unq_bls):2] = 0 # lower bound for gain amps
@@ -749,11 +770,11 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx, \
-                                              constr_phase, amp_constr)])
+                                              constr_phase, amp_constr, logamp)])
     return res, initp
 
 
-def set_grefT(gain_comps, mphase_ref_ant_idx, ophase_ref_ant_idx, \
+def set_grefT(gain_comps, mrefant_idx, orefant_idx, \
               ant_pos, amp_constr):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1, the mean of all gain
@@ -761,14 +782,14 @@ def set_grefT(gain_comps, mphase_ref_ant_idx, ophase_ref_ant_idx, \
 
     :param gain_comps: Interweaved polar gain components without reference gain
     :type gain_comps: ndarray
-    :param mphase_ref_ant_idx: Index of reference antenna that sets the mean of
+    :param mrefant_idx: Index of reference antenna that sets the mean of
     the gan phases to 0 in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
-    :type mphase_ref_ant_idx: int
-    :param ophase_ref_ant_idx: Index of reference antenna that sets the overall
+    :type mrefant_idx: int
+    :param orefant_idx: Index of reference antenna that sets the overall
     phase to 0 in ordered list of antennas.
     Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
-    :type ophase_ref_ant_idx: int
+    :type orefant_idx: int
     :param amp_constr: Constraint to apply to gain amplitudes: either the
     {"prod", "mean"} of gain amplitudes = 1
     :type amp_constr: str
@@ -776,14 +797,14 @@ def set_grefT(gain_comps, mphase_ref_ant_idx, ophase_ref_ant_idx, \
     :return: Interweaved polar gain components with reference gain included
     :rtype: ndarray
     """
-    assert ophase_ref_ant_idx > mphase_ref_ant_idx, 'Ensure the index of the '\
+    assert orefant_idx > mrefant_idx, 'Ensure the index of the '\
     'referance antenna that sets the overall phase is higher than that which sets '\
     'the mean phase'
-    gamps = np.log(gain_comps[::2])
+    gamps = np.exp(gain_comps[::2])
     gphases = gain_comps[1::2]
-    gamp1, gamp2 = np.split(gamps, [mphase_ref_ant_idx])
-    gphase1, gphase2, gphase3 = np.split(gphases, [mphase_ref_ant_idx, \
-                                         ophase_ref_ant_idx])
+    gamp1, gamp2 = np.split(gamps, [mrefant_idx])
+    gphase1, gphase2, gphase3 = np.split(gphases, [mrefant_idx, \
+                                         orefant_idx])
     # set reference gain constraints
     if amp_constr == 'prod':
         gampref = 1/gamps.prod() # constraint that the product of amps is 1
@@ -795,11 +816,11 @@ def set_grefT(gain_comps, mphase_ref_ant_idx, ophase_ref_ant_idx, \
 
     mgphaseref = -gphases.sum() # constraint that the mean phase is 0
     ogphaseref = 0 # set the phase of the reference antenna to be 0 (overall phase)
-    # ant_pos_rest1 = np.vstack((ant_pos[:ophase_ref_ant_idx, :], \
-    #                            ant_pos[ophase_ref_ant_idx+1:, :]))
-    # ant_pos_rest2 = np.vstack((ant_pos_rest1[:mphase_ref_ant_idx, :], \
-    #                            ant_pos_rest1[mphase_ref_ant_idx+1:, :]))
-    # ogphaseref = 1/(ant_pos[ophase_ref_ant_idx, 0] + ant_pos[ophase_ref_ant_idx, 1]) \
+    # ant_pos_rest1 = np.vstack((ant_pos[:orefant_idx, :], \
+    #                            ant_pos[orefant_idx+1:, :]))
+    # ant_pos_rest2 = np.vstack((ant_pos_rest1[:mrefant_idx, :], \
+    #                            ant_pos_rest1[mrefant_idx+1:, :]))
+    # ogphaseref = 1/(ant_pos[orefant_idx, 0] + ant_pos[orefant_idx, 1]) \
     #     * np.sum((ant_pos_rest2[:, 0] + ant_pos_rest2[:, 1]) * gphases) # set the tilt to be zero
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, mgphaseref, gphase2, ogphaseref, gphase3])
@@ -807,9 +828,8 @@ def set_grefT(gain_comps, mphase_ref_ant_idx, ophase_ref_ant_idx, \
     return gain_comps
 
 
-def relative_logLklRPT(credg, distribution, obsvis, mphase_ref_ant_idx, \
-                       ophase_ref_ant_idx, ant_pos, no_unq_bls, amp_constr, \
-                       params):
+def relative_nlogLklRPT(credg, distribution, obsvis, mrefant_idx, orefant_idx, \
+                        ant_pos, no_unq_bls, amp_constr, tilt_reg, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain, phase and tilt constraints*
@@ -823,25 +843,28 @@ def relative_logLklRPT(credg, distribution, obsvis, mphase_ref_ant_idx, \
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
     :type credg: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with credg
     :type obsvis: ndarray
-    :param mphase_ref_ant_idx: Index of reference antenna that sets the mean of
+    :param mrefant_idx: Index of reference antenna that sets the mean of
     the gan phases to 0 in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
-    :type mphase_ref_ant_idx: int
-    :param ophase_ref_ant_idx: Index of reference antenna that sets the overall
+    :type mrefant_idx: int
+    :param orefant_idx: Index of reference antenna that sets the overall
     phase to 0 in ordered list of antennas.
     Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
-    :type ophase_ref_ant_idx: int
+    :type orefant_idx: int
     :param no_unq_bls: Number of unique baselines (equivalently the number of
     redundant visibilities)
     :type no_unq_bls: int
     :param amp_constr: Constraint to apply to gain amplitudes: either the
     {"prod", "mean"} of gain amplitudes = 1
     :type amp_constr: str
+    :param tilt_reg: Whether to add regularization term to constrain tilt shifts to 0
+    :type tilt_reg: bool
     :param params: Parameters to constrain - redundant visibilities and gains
     (Amp & Phase components interweaved for both)
     :type params: ndarray
@@ -850,24 +873,29 @@ def relative_logLklRPT(credg, distribution, obsvis, mphase_ref_ant_idx, \
     :rtype: float
     """
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
-    vis = makeEArray(vis_comps)
-    gain_comps = set_grefT(gain_comps, mphase_ref_ant_idx, \
-                           ophase_ref_ant_idx, ant_pos, amp_constr)
-    gphases = gain_comps[1::2]
+    gain_comps = set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos, amp_constr)
     gains = makeEArray(gain_comps)
+    vis = makeEArray(vis_comps)
     delta = obsvis - gVis(vis, credg, gains)
-    log_likelihood = LLFN[distribution](delta)
-    return log_likelihood + (np.square(np.sum(ant_pos[:, 0]*gphases)) + np.square(np.sum(ant_pos[:, 1]*gphases)))/(np.pi/180)
+    nlog_likelihood = NLLFN[distribution](delta)
+    nlog_likelihood
+    if tilt_reg:
+        gphases = gain_comps[1::2]
+        tilt_reg_pen = (np.square(np.sum(ant_pos[:, 0]*gphases)) + \
+                        np.square(np.sum(ant_pos[:, 1]*gphases)))/(np.pi/180)
+        nlog_likelihood += tilt_reg_pen
+    return nlog_likelihood
 
 
 def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauchy', \
-                mphase_ref_ant_idx=16, ophase_ref_ant_idx=25, amp_constr='prod', \
-                bounded=False, initp=None, max_nit=1000):
+                mrefant_idx=16, orefant_idx=25, amp_constr='prod', bounded=False, \
+                tilt_reg=False, initp=None, max_nit=1000):
     """Do relative step of redundant calibration
 
     *Polar coordinates with implicit constraints that include mean gain amplitude,
-    mean gain phase, and overall phase. Regularization term added to constrain the
-    tilts.*
+    mean gain phase, and overall phase. Amplitudes forced to be positive by
+    exponentiating the parameters responsibly for determining the gain amplitudes.
+    Regularization term added to constrain the tilts.*
 
     Initial parameter guesses, if not specified, are 1*e(0j) and 0*e(0j) for
     the gains and the true sky visibilities.
@@ -883,22 +911,25 @@ def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauch
     :type no_unq_bls: int
     :param no_ants: Number of antennas for given observation
     :type no_ants: int
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
-    :param mphase_ref_ant_idx: Index of reference antenna that sets the mean of
+    :param mrefant_idx: Index of reference antenna that sets the mean of
     the gan phases to 0 in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
-    :type mphase_ref_ant_idx: int
-    :param ophase_ref_ant_idx: Index of reference antenna that sets the overall
+    :type mrefant_idx: int
+    :param orefant_idx: Index of reference antenna that sets the overall
     phase to 0 in ordered list of antennas.
     Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
-    :type ophase_ref_ant_idx: int
+    :type orefant_idx: int
     :param amp_constr: Constraint to apply to gain amplitudes: either the
     {"prod", "mean"} of gain amplitudes = 1
     :type amp_constr: str
     :param bounded: Bounded optimization, where the amplitudes for the visibilities
     and the gains must be > 0. 'trust-constr' method used.
     :type bounded: bool
+    :param tilt_reg: Whether to add regularization term to constrain tilt shifts to 0
+    :type tilt_reg: bool
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
@@ -912,25 +943,24 @@ def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauch
         # set up initial parameters
         xvamps = np.zeros(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
-        xgamps = np.repeat(np.e, no_ants-2) # e^gain amplitudes (to force positive)
+        xgamps = np.zeros(no_ants-2) # to exponentiate (to force positive gamps)
         xgphases = np.zeros(no_ants-2) # gain phases
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
-        initp = np.append(initp, np.array([np.e])) # Adding back a gain amplitude
+        initp = np.append(initp, np.array([0.])) # Adding back a gain amplitude
 
-    ff = jit(functools.partial(relative_logLklRPT, credg, distribution, obsvis, \
-                               mphase_ref_ant_idx, ophase_ref_ant_idx, ant_pos, \
-                               no_unq_bls, amp_constr))
+    ff = jit(functools.partial(relative_nlogLklRPT, credg, distribution, obsvis, \
+                               mrefant_idx, orefant_idx, ant_pos, no_unq_bls, \
+                               amp_constr, tilt_reg))
 
-    res = minimize(ff, initp, bounds=None, method='BFGS', \
-                   jac=jacrev(ff), options={'maxiter':max_nit})
+    res = minimize(ff, initp, bounds=None, method='BFGS', jac=jacrev(ff), \
+                   options={'maxiter':max_nit})
     print(res['message'])
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
-    res['x'] = np.hstack([vis_comps, set_grefT(gain_comps, mphase_ref_ant_idx, \
-                                               ophase_ref_ant_idx, ant_pos, \
-                                               amp_constr)])
+    res['x'] = np.hstack([vis_comps, set_grefT(gain_comps, mrefant_idx, \
+                                               orefant_idx, ant_pos, amp_constr)])
     return res, initp
 
 
@@ -961,8 +991,8 @@ def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     return w_alpha
 
 
-def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, params):
-    """Optimal likelihood calculator
+def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, params):
+    """Optimal negative log-likelihood calculator
 
     We solve for the degeneracies in redundant calibration. This must be done
     after relative redundant calibration. We also set the noise for each visibility
@@ -971,7 +1001,8 @@ def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, param
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
     :type credg: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with credg
@@ -994,8 +1025,8 @@ def optimal_logLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, param
 
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
     delta = obsvis - gVis(w_alpha, credg, rel_gains)
-    log_likelihood = LLFN[distribution](delta)
-    return log_likelihood
+    nlog_likelihood = NLLFN[distribution](delta)
+    return nlog_likelihood
 
 
 class Opt_Constraints:
@@ -1103,7 +1134,8 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
     :param rel_vis: Visibility solutions for redundant baseline groups after
     relative calibration
     :param rel_vis: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param ref_ant_idx: Index of reference antenna in ordered list of antennas to
     constrain overall phase. Default is 16 (corresponding to antenna 55 in H1C_IDR2
@@ -1143,7 +1175,7 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
             {'type': 'eq', 'fun': constraints.phase_grad_y}
             ]
 
-    ff = jit(functools.partial(optimal_logLkl, credg, distribution, \
+    ff = jit(functools.partial(optimal_nlogLkl, credg, distribution, \
                                ant_sep, obsvis, rel_vis, no_ants))
     res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
                    constraints=cons, bounds=bounds, method='trust-constr', \
@@ -1152,14 +1184,15 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
     return res
 
 
-def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
-    """Degenerate likelihood calculator
+def deg_nlogLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
+    """Degenerate negative log-likelihood calculator
 
     Max-likelihood estimate to solve for the degenerate parameters that transform
     between the visibility solutions of two different datasets after relative
     calibration
 
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param ant_sep: Antenna seperation for baseline types
     :type ant_sep: ndarray
@@ -1178,8 +1211,8 @@ def deg_logLkl(distribution, ant_sep, rel_vis1, rel_vis2, params):
     """
     w_alpha = degVis(ant_sep, rel_vis1, *params)
     delta = rel_vis2 - w_alpha
-    log_likelihood = LLFN[distribution](delta)
-    return log_likelihood
+    nlog_likelihood = NLLFN[distribution](delta)
+    return nlog_likelihood
 
 
 def doDegVisVis(ant_sep, rel_vis1, rel_vis2, distribution='cauchy', \
@@ -1196,7 +1229,8 @@ def doDegVisVis(ant_sep, rel_vis1, rel_vis2, distribution='cauchy', \
     :param rel_vis2: Visibility solutions for observation set 2 for redundant
     baseline groups after relative calibration
     :param rel_vis2: ndarray
-    :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
     :type distribution: str
     :param initp: Initial parameter guesses for degenerate parameters (overall
     amplitude, x phase gradient and y phase gradient)
@@ -1212,7 +1246,7 @@ def doDegVisVis(ant_sep, rel_vis1, rel_vis2, distribution='cauchy', \
         # set up initial params: overall amp, x and y phase gradients
         initp = np.asarray([1, 0, 0])
 
-    ff = jit(functools.partial(deg_logLkl, distribution, ant_sep, \
+    ff = jit(functools.partial(deg_nlogLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
     res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
     print(res['message'])
