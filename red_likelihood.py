@@ -340,6 +340,24 @@ def flt_ant_pos(ant_pos, ants):
     return flt_ant_pos_arr
 
 
+def exp_amps(gain_comps):
+    """Exponentiate the gain amplitude components of an interweaved ravelled
+    array of gain components. Useful if the logarithm of gain amplitudes are
+    used as parameters; this forces the gain amplitudes to be positive
+
+    :param gain_comps: Gain component array where log(amplitude) and phase components
+    are adjacent
+    :type gain_comps: ndarray
+
+    :return: Gain component array where amplitude and phase components are adjacent
+    :rtype: ndarray
+    """
+    gamps = np.exp(gain_comps[::2])
+    gphases = gain_comps[1::2]
+    gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+    return gain_comps
+
+
 @jit
 def gVis(vis, credg, gains):
     """Apply gains to visibilities
@@ -410,9 +428,7 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
     if logamp:
         # transforming gain amplitudes to force positive results
-        gamps = np.exp(gain_comps[::2])
-        gphases = gain_comps[1::2]
-        gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+        gain_comps = exp_amps(gain_comps)
     vis = makeC[coords](vis_comps)
     gains = makeC[coords](gain_comps)
     delta = obsvis - gVis(vis, credg, gains)
@@ -540,9 +556,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     if logamp and coords == 'polar':
         # transforming gain amplitudes back
         vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
-        gamps = np.exp(gain_comps[::2])
-        gphases = gain_comps[1::2]
-        gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+        gain_comps = exp_amps(gain_comps)
         res['x'] = numpy.array(np.hstack([vis_comps, gain_comps]))
     if norm_gains:
         if coords == 'polar' and (res['x'][-2*no_ants::2] < 0).any():
@@ -1032,7 +1046,8 @@ def degVis(ant_sep, rel_vis, amp, phase_grad_x, phase_grad_y):
     return w_alpha
 
 
-def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, params):
+def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, \
+                    logamp, params):
     """Optimal negative log-likelihood calculator
 
     We solve for the degeneracies in redundant calibration. This must be done
@@ -1053,6 +1068,9 @@ def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, para
     :param rel_vis: Visibility solutions for redundant baseline groups after
     relative calibration
     :param rel_vis: ndarray
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned
+    :type logamp: bool
     :param params: Parameters to constrain: normalized gains (amp and phase
     components interweaved), overall amplitude, overall phase and phase
     gradients in x and y
@@ -1062,8 +1080,9 @@ def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, para
     :rtype: float
      """
     rel_gain_comps, deg_params = np.split(params, [2*no_ants,])
+    if logamp:
+        rel_gain_comps = exp_amps(rel_gain_comps)
     rel_gains = makeEArray(rel_gain_comps)
-
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
     delta = obsvis - gVis(w_alpha, credg, rel_gains)
     nlog_likelihood = NLLFN[distribution](delta)
@@ -1087,15 +1106,19 @@ class Opt_Constraints:
     :param ant_pos: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
     :type ant_pos: ndarray
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned
+    :type logamp: bool
     :param params: Parameters to feed into optimal absolute calibration
     :type params: ndarray
     """
-    def __init__(self, no_ants, ref_ant_idx, ant_pos):
+    def __init__(self, no_ants, ref_ant_idx, ant_pos, logamp):
         self.no_ants = no_ants
         self.ref_ant_idx = ref_ant_idx
         self.ant_pos = ant_pos
         self.x_pos = ant_pos[:, 0]
         self.y_pos = ant_pos[:, 1]
+        self.logamp = logamp
 
     def avg_amp(self, params):
         """Constraint that mean of gain amplitudes must be equal to 1
@@ -1104,6 +1127,8 @@ class Opt_Constraints:
         :rtype: float
         """
         amps = params[:self.no_ants*2:2]
+        if self.logamp:
+            amps = np.exp(amps)
         return np.mean(amps) - 1
 
     def avg_phase(self, params):
@@ -1153,7 +1178,7 @@ class Opt_Constraints:
 
 
 def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='cauchy', \
-             ref_ant_idx=16, initp=None, max_nit=1000):
+             ref_ant_idx=16, logamp=False, initp=None, max_nit=1000):
     """Do optimal absolute step of redundant calibration
 
     Initial degenerate parameter guesses are 0 for the overall amplitude,
@@ -1161,7 +1186,7 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
 
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
-    :type credg: ndarray
+    :type credg: ndarray§
     :param obsvis: Observed sky visibilities for a given frequency and given time,
     reformatted to have format consistent with redg
     :type obsvis: ndarray
@@ -1182,6 +1207,9 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
     constrain overall phase. Default is 16 (corresponding to antenna 55 in H1C_IDR2
     dataset).
     :type ref_ant_idx: int
+    :param logamp: The logarithm of the amplitude initial parameters is taken,
+    such that only positive solutions can be returned
+    :type logamp: bool
     :param initp: Initial parameter guesses for gains and degenerate parameters
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
@@ -1193,7 +1221,11 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
     """
     if initp is None:
         # set up initial parameters
-        xgamps = np.ones(no_ants) # gain amplitudes
+        # gain amplitudes
+        if logamp:
+            xgamps = np.zeros(no_ants)
+        else:
+            xgamps = np.ones(no_ants)
         xgphases = np.zeros(no_ants) # gain phases
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         xdegparams = np.zeros(4) # overall amplitude, overall phase,
@@ -1202,13 +1234,17 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
 
     lb = numpy.repeat(-np.inf, initp.size)
     ub = numpy.repeat(np.inf, initp.size)
-    lb[:no_ants*2:2] = 0 # lower bound for gain amplitudes
+    if not logamp:
+        lb[:no_ants*2:2] = 0 # lower bound for gain amplitudes
+    else:
+        print('Disregarding bounds on amplitudes as using logamp method')
     lb[-4] = 0 # lower bound for overall amplitude
     bounds = Bounds(lb, ub)
 
     # constraints for optimization
-    constraints = Opt_Constraints(no_ants, ref_ant_idx, ant_pos)
-    cons = [{'type': 'eq', 'fun': constraints.avg_amp},
+    constraints = Opt_Constraints(no_ants, ref_ant_idx, ant_pos, logamp)
+    cons = [
+            {'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},
             {'type': 'eq', 'fun': constraints.ref_phase},
             # {'type': 'eq', 'fun': constraints.ref_amp}, # not needed (?)
@@ -1217,11 +1253,15 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
             ]
 
     ff = jit(functools.partial(optimal_nlogLkl, credg, distribution, \
-                               ant_sep, obsvis, rel_vis, no_ants))
+                               ant_sep, obsvis, rel_vis, no_ants, logamp))
     res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
                    constraints=cons, bounds=bounds, method='trust-constr', \
                    options={'maxiter':max_nit})
     print(res['message'])
+    if logamp:
+        rel_gain_comps, deg_params = np.split(res['x'], [2*no_ants,])
+        rel_gain_comps = exp_amps(rel_gain_comps)
+        res['x'] = np.hstack([rel_gain_comps, deg_params])
     return res
 
 
