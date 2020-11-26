@@ -326,8 +326,7 @@ def flt_ant_pos(ant_pos, ants):
     """Filters antenna positions dictionary from HERAData container by good
     antennas, sorts them, and returns ndarray of shape (no_ants, 3)
 
-    :param ant_pos: Dictionary of antenna position coordinates for the antennas
-    in ants
+    :param ant_pos: Antenna positions from HERAData container
     :type ant_pos: dict
     :param ants: Good antennas
     :type ants: list
@@ -384,7 +383,7 @@ makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
 
 def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
-                     tilt_reg, gphase_reg, ant_pos, params):
+                     tilt_reg, gphase_reg, ant_pos_arr, params):
     """Redundant relative negative log-likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -415,9 +414,9 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     :type tilt_reg: bool
     :param gphase_reg: Add regularization term to constrain the gain phase mean
     :type gphase_reg: bool
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im [cartesian] or Amp & Phase [polar] components interweaved for both)
     :type params: ndarray
@@ -439,8 +438,8 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
         else:
             gphases = gain_comps[1::2]
         if tilt_reg:
-            tilt_reg_pen = (np.square(np.sum(ant_pos[:, 0]*gphases)) + \
-                            np.square(np.sum(ant_pos[:, 1]*gphases)))/(np.pi/180)
+            tilt_reg_pen = (np.square(np.sum(ant_pos_arr[:, 0]*gphases)) + \
+                            np.square(np.sum(ant_pos_arr[:, 1]*gphases)))/(np.pi/180)
             nlog_likelihood += tilt_reg_pen
         if gphase_reg:
             gphase_reg_pen = np.square(gphases.mean())/(np.pi/180)
@@ -450,7 +449,7 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
              bounded=False, logamp=False, initp=None, norm_gains=False, tilt_reg=False, \
-             gphase_reg=False, ant_pos=None, max_nit=1000, jax_minimizer=False):
+             gphase_reg=False, ant_pos_arr=None, max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -487,9 +486,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :type tilt_reg: bool
     :param gphase_reg: Add regularization term to constrain the gain phase mean
     :type gphase_reg: bool
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
     :param jax_minimizer: Use jax minimization implementation - only if unbounded
@@ -525,12 +524,12 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                              "polar"}')
         initp = np.hstack([xvis, xgains])
 
-    if tilt_reg and ant_pos is None:
+    if tilt_reg and ant_pos_arr is None:
         raise ValueError('Specify antenna positions to constrain tilt shit')
 
     ff = jit(functools.partial(relative_nlogLkl, credg, distribution, obsvis, \
                                no_unq_bls, coords, logamp, tilt_reg, gphase_reg, \
-                               ant_pos))
+                               ant_pos_arr))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
@@ -821,7 +820,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     return res, initp
 
 
-def set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos, amp_constr):
+def set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos_arr, amp_constr):
     """Return gain components with reference gain included, constrained to be
     such that the product of all gain amplitudes is 1, the mean of all gain
     phases is 0 and that the tilts are 0
@@ -836,9 +835,9 @@ def set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos, amp_constr):
     phase to 0 in ordered list of antennas.
     Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
     :type orefant_idx: int
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param amp_constr: Constraint to apply to gain amplitudes: either the
     {"prod", "mean"} of gain amplitudes = 1
     :type amp_constr: str
@@ -865,11 +864,11 @@ def set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos, amp_constr):
 
     mgphaseref = -gphases.sum() # constraint that the mean phase is 0
     ogphaseref = 0 # set the phase of the reference antenna to be 0 (overall phase)
-    # ant_pos_rest1 = np.vstack((ant_pos[:orefant_idx, :], \
-    #                            ant_pos[orefant_idx+1:, :]))
+    # ant_pos_rest1 = np.vstack((ant_pos_arr[:orefant_idx, :], \
+    #                            ant_pos_arr[orefant_idx+1:, :]))
     # ant_pos_rest2 = np.vstack((ant_pos_rest1[:mrefant_idx, :], \
     #                            ant_pos_rest1[mrefant_idx+1:, :]))
-    # ogphaseref = 1/(ant_pos[orefant_idx, 0] + ant_pos[orefant_idx, 1]) \
+    # ogphaseref = 1/(ant_pos_arr[orefant_idx, 0] + ant_pos_arr[orefant_idx, 1]) \
     #     * np.sum((ant_pos_rest2[:, 0] + ant_pos_rest2[:, 1]) * gphases) # set the tilt to be zero
     gamps = np.hstack([gamp1, gampref, gamp2])
     gphases = np.hstack([gphase1, mgphaseref, gphase2, ogphaseref, gphase3])
@@ -878,7 +877,7 @@ def set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos, amp_constr):
 
 
 def relative_nlogLklRPT(credg, distribution, obsvis, mrefant_idx, orefant_idx, \
-                        ant_pos, no_unq_bls, amp_constr, tilt_reg, params):
+                        ant_pos_arr, no_unq_bls, amp_constr, tilt_reg, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain, phase and tilt constraints*
@@ -906,9 +905,9 @@ def relative_nlogLklRPT(credg, distribution, obsvis, mrefant_idx, orefant_idx, \
     phase to 0 in ordered list of antennas.
     Default is 25 (corresponding to antenna 85 in H1C_IDR2 dataset).
     :type orefant_idx: int
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param no_unq_bls: Number of unique baselines (equivalently the number of
     redundant visibilities)
     :type no_unq_bls: int
@@ -925,7 +924,7 @@ def relative_nlogLklRPT(credg, distribution, obsvis, mrefant_idx, orefant_idx, \
     :rtype: float
     """
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
-    gain_comps = set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos, amp_constr)
+    gain_comps = set_grefT(gain_comps, mrefant_idx, orefant_idx, ant_pos_arr, amp_constr)
     gains = makeEArray(gain_comps)
     vis = makeEArray(vis_comps)
     delta = obsvis - gVis(vis, credg, gains)
@@ -933,13 +932,13 @@ def relative_nlogLklRPT(credg, distribution, obsvis, mrefant_idx, orefant_idx, \
     nlog_likelihood
     if tilt_reg:
         gphases = gain_comps[1::2]
-        tilt_reg_pen = (np.square(np.sum(ant_pos[:, 0]*gphases)) + \
-                        np.square(np.sum(ant_pos[:, 1]*gphases)))/(np.pi/180)
+        tilt_reg_pen = (np.square(np.sum(ant_pos_arr[:, 0]*gphases)) + \
+                        np.square(np.sum(ant_pos_arr[:, 1]*gphases)))/(np.pi/180)
         nlog_likelihood += tilt_reg_pen
     return nlog_likelihood
 
 
-def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauchy', \
+def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos_arr, distribution='cauchy', \
                 mrefant_idx=16, orefant_idx=25, amp_constr='prod', bounded=False, \
                 tilt_reg=False, initp=None, max_nit=1000):
     """Do relative step of redundant calibration
@@ -963,9 +962,9 @@ def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauch
     :type no_unq_bls: int
     :param no_ants: Number of antennas for given observation
     :type no_ants: int
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param distribution: Distribution assumption of noise under MLE {'gaussian',
     'cauchy'}
     :type distribution: str
@@ -1006,7 +1005,7 @@ def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauch
         initp = np.append(initp, np.array([0.])) # Adding back a gain amplitude
 
     ff = jit(functools.partial(relative_nlogLklRPT, credg, distribution, obsvis, \
-                               mrefant_idx, orefant_idx, ant_pos, no_unq_bls, \
+                               mrefant_idx, orefant_idx, ant_pos_arr, no_unq_bls, \
                                amp_constr, tilt_reg))
 
     res = minimize(ff, initp, bounds=None, method='BFGS', jac=jacrev(ff), \
@@ -1015,7 +1014,7 @@ def doRelCalRPT(credg, obsvis, no_unq_bls, no_ants, ant_pos, distribution='cauch
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_grefT(gain_comps, mrefant_idx, \
-                                               orefant_idx, ant_pos, amp_constr)])
+                                               orefant_idx, ant_pos_arr, amp_constr)])
     return res, initp
 
 
@@ -1103,21 +1102,21 @@ class Opt_Constraints:
     constrain overall phase. Default is 16 (corresponding to antenna 55 in H1C_IDR2
     dataset).
     :type ref_ant_idx: int
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param logamp: The logarithm of the amplitude initial parameters is taken,
     such that only positive solutions can be returned
     :type logamp: bool
     :param params: Parameters to feed into optimal absolute calibration
     :type params: ndarray
     """
-    def __init__(self, no_ants, ref_ant_idx, ant_pos, logamp):
+    def __init__(self, no_ants, ref_ant_idx, ant_pos_arr, logamp):
         self.no_ants = no_ants
         self.ref_ant_idx = ref_ant_idx
-        self.ant_pos = ant_pos
-        self.x_pos = ant_pos[:, 0]
-        self.y_pos = ant_pos[:, 1]
+        self.ant_pos_arr = ant_pos_arr
+        self.x_pos = ant_pos_arr[:, 0]
+        self.y_pos = ant_pos_arr[:, 1]
         self.logamp = logamp
 
     def avg_amp(self, params):
@@ -1177,7 +1176,7 @@ class Opt_Constraints:
         return np.sum(phases*self.y_pos)
 
 
-def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='cauchy', \
+def doOptCal(credg, obsvis, no_ants, ant_pos_arr, ant_sep, rel_vis, distribution='cauchy', \
              ref_ant_idx=16, logamp=False, initp=None, max_nit=1000):
     """Do optimal absolute step of redundant calibration
 
@@ -1192,9 +1191,9 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
     :type obsvis: ndarray
     :param no_ants: Number of antennas for given observation
     :type no_ants: int
-    :param ant_pos: Array of filtered antenna position coordinates for the antennas
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
-    :type ant_pos: ndarray
+    :type ant_pos_arr: ndarray
     :param ant_sep: Antenna seperation for baseline types. See red_ant_sep.
     :type ant_sep: ndarray
     :param rel_vis: Visibility solutions for redundant baseline groups after
@@ -1242,7 +1241,7 @@ def doOptCal(credg, obsvis, no_ants, ant_pos, ant_sep, rel_vis, distribution='ca
     bounds = Bounds(lb, ub)
 
     # constraints for optimization
-    constraints = Opt_Constraints(no_ants, ref_ant_idx, ant_pos, logamp)
+    constraints = Opt_Constraints(no_ants, ref_ant_idx, ant_pos_arr, logamp)
     cons = [
             {'type': 'eq', 'fun': constraints.avg_amp},
             {'type': 'eq', 'fun': constraints.avg_phase},

@@ -354,17 +354,17 @@ def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None,
     plt.show()
 
 
-def antpos_map(values, antpos, title=None, std_rng=2, center=None, \
+def antpos_map(values, flt_ant_pos, title=None, std_rng=2, center=None, \
                cmap='bwr', figsize=(10, 8)):
     """Scatter plot of values attributed to antennas, according to their
     physical positions
 
     :param values: Values to determine colour of antenna scatter points
     :type values: ndarray
-    :param values: Filtered (bad ants removed) antenna positions
-    :type values: dict
-    :param values: Title of plot
-    :type values: str, None
+    :param flt_ant_pos: Filtered dict of antenna positions. See flt_ant_coords
+    :type flt_ant_pos: dict
+    :param title: Title of plot
+    :type title: str, None
     :param std_rng: Number of standard deviations for the values to set the vmin
     and vmax of the colourmap
     :type std_rng: int, float
@@ -384,15 +384,15 @@ def antpos_map(values, antpos, title=None, std_rng=2, center=None, \
         vmin = None
         vmax = None
         center = numpy.mean(values)
-    im = ax.scatter(numpy.array(list(antpos.values()))[:,0], \
-                    numpy.array(list(antpos.values()))[:,1], \
+    im = ax.scatter(numpy.array(list(flt_ant_pos.values()))[:,0], \
+                    numpy.array(list(flt_ant_pos.values()))[:,1], \
                     c=values, s=800, cmap=cmap, vmin=vmin, \
                     vmax=vmax)
     # get RGBA colours of individual points
     rgba = im.to_rgba(values)
     # ITU-R 601-2 luma transform to greyscale
     c_lin = 0.299*rgba[:, 0] + 0.587*rgba[:, 1] + 0.114*rgba[:, 2]
-    for i, (ant_no, pos) in enumerate(antpos.items()):
+    for i, (ant_no, pos) in enumerate(flt_ant_pos.items()):
         if c_lin[i] > 0.87:
             colour='black'
         else:
