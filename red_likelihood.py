@@ -634,31 +634,40 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr, logamp):
     """
     # Cannot assign directly to gain_comps because get
     # TypeError: JAX 'Tracer' objects do not support item assignment
-    if constr_phase:
-        gamps = gain_comps[::2]
-    else:
-        gamps = gain_comps[:-1:2]
-        gphaseref = gain_comps[-1]
     if logamp:
-        # transforming gain amplitudes to force positive results
-        gamps = np.exp(gamps)
-    gphases = gain_comps[1::2]
-    gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
-    gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
-    # set reference gain constraints
-    if amp_constr == 'prod':
-        gampref = 1/gamps.prod() # ensure that product of amps is 1
-    elif amp_constr == 'mean':
-        gampref = gamps.size + 1 - gamps.sum() # ensure that mean of amps is 1
+        gamps = gain_comps[::2]
+        gamps = np.exp(gamps) # transforming gain amplitudes to force positive results
+        gphases = gain_comps[1::2]
     else:
-        raise ValueError('Specify a correct gain amplitude constraint: \
-                         {"prod", "mean"}')
+        if constr_phase:
+            gamps = gain_comps[::2]
+            gphases = gain_comps[1::2]
+        else:
+            gamps = gain_comps[:-1:2]
+            gphases1 = gain_comps[1:-1:2]
+            gphases2 = gain_comps[-1]
+            gphases = np.hstack([gphases1, gphases2])
+
+    if not logamp:
+        # set reference gain amplitude constraint
+        gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
+        if amp_constr == 'prod':
+            gampref = 1/gamps.prod() # ensure that product of amps is 1
+        elif amp_constr == 'mean':
+            gampref = gamps.size + 1 - gamps.sum() # ensure that mean of amps is 1
+        else:
+            raise ValueError('Specify a correct gain amplitude constraint: \
+                             {"prod", "mean"}')
+        gamps = np.hstack([gamp1, gampref, gamp2])
+
     if constr_phase:
+        # set reference gain phase constraint
+        gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
         gphaseref = -gphases.sum() # constraint that the mean phase is 0
         # gphaseref = -circmean(gphases) # constraint that the circular mean phase is 0
         # gphaseref = 0 # set the phase of the reference antenna to be 0
-    gamps = np.hstack([gamp1, gampref, gamp2])
-    gphases = np.hstack([gphase1, gphaseref, gphase2])
+        gphases = np.hstack([gphase1, gphaseref, gphase2])
+
     gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
     return gain_comps
 
@@ -769,15 +778,23 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
         xvamps = np.zeros(no_unq_bls) # vis amplitudes
         xvphases = np.zeros(no_unq_bls) # vis phases
         if logamp:
-            xgamps = np.zeros(no_ants-1)
+            xgamps = np.zeros(no_ants-1) # gain amps
+            xgphases = np.zeros(no_ants-1) # gain phases
+            add_amp = 0.
             if bounded:
                 print('Disregarding bounded argument in favour of logamp approach')
+            if amp_constr == 'prod':
+                print('Constraining the mean of gain amplitudes to be 1 instead, '\
+                      'of the product, when logamp is True')
         else:
-            xgamps = np.ones(no_ants-1)
-        xgphases = np.zeros(no_ants-1) # gain phases
+            xgamps = np.ones(no_ants-1) # gain amps
+            xgphases = np.zeros(no_ants-1) # gain phases
+            add_amp = 1.
         xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
         initp = np.hstack([xvis, xgains])
+        if logamp:
+            initp = np.append(initp, np.array([add_amp])) # add back a gamp param
         if not constr_phase:
             initp = np.append(initp, np.array([0]))
 
@@ -795,8 +812,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
             ub = numpy.repeat(np.inf, initp.size)
             lb[:2*(no_unq_bls):2] = 0 # lower bound for gain amps
             # lb[:2*(no_unq_bls+no_ants-1):2] = 0 # lower bound for gain and
-            # vis amps - vis amp boundary found to be unnecessary and minimization
-            # takes longer
+            # vis amps - vis amp boundary found to be unnecessary and takes longer
             bounds = Bounds(lb, ub)
             # method = 'L-BFGS-B' # get b'ABNORMAL_TERMINATION_IN_LNSRCH'
             # jac = lambda x: numpy.array(jacrev(ff)(x))
@@ -817,6 +833,8 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
     res['x'] = np.hstack([vis_comps, set_gref(gain_comps, ref_ant_idx, \
                                               constr_phase, amp_constr, logamp)])
+    if logamp:
+        res['x'] = norm_rel_sols(numpy.array(res['x']), no_unq_bls, coords='polar')
     return res, initp
 
 
