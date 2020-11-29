@@ -438,6 +438,8 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
         else:
             gphases = gain_comps[1::2]
         if tilt_reg:
+            if ant_pos_arr is None:
+                raise ValueError('Input antenna position array to constrain tilts')
             tilt_reg_pen = (np.square(np.sum(ant_pos_arr[:, 0]*gphases)) + \
                             np.square(np.sum(ant_pos_arr[:, 1]*gphases)))/(np.pi/180)
             nlog_likelihood += tilt_reg_pen
@@ -523,9 +525,6 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             raise ValueError('Specify a correct coordinate system: {"cartesian", \
                              "polar"}')
         initp = np.hstack([xvis, xgains])
-
-    if tilt_reg and ant_pos_arr is None:
-        raise ValueError('Specify antenna positions to constrain tilt shit')
 
     ff = jit(functools.partial(relative_nlogLkl, credg, distribution, obsvis, \
                                no_unq_bls, coords, logamp, tilt_reg, gphase_reg, \
@@ -652,9 +651,9 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr, logamp):
         # set reference gain amplitude constraint
         gamp1, gamp2 = np.split(gamps, [ref_ant_idx])
         if amp_constr == 'prod':
-            gampref = 1/gamps.prod() # ensure that product of amps is 1
+            gampref = 1/gamps.prod() # constraint that the product of amps is 1
         elif amp_constr == 'mean':
-            gampref = gamps.size + 1 - gamps.sum() # ensure that mean of amps is 1
+            gampref = gamps.size + 1 - gamps.sum() # constraint that the mean of amps is 1
         else:
             raise ValueError('Specify a correct gain amplitude constraint: \
                              {"prod", "mean"}')
@@ -673,7 +672,8 @@ def set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr, logamp):
 
 
 def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
-                      constr_phase, amp_constr, logamp, params):
+                       constr_phase, amp_constr, logamp, tilt_reg, gphase_reg, \
+                       ant_pos_arr, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain constraints*
@@ -706,6 +706,13 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :param logamp: The logarithm of the amplitude initial parameters is taken,
     such that only positive solutions can be returned. Only if coords=="polar".
     :type logamp: bool
+    :param tilt_reg: Add regularization term to constrain tilt shifts to 0
+    :type tilt_reg: bool
+    :param gphase_reg: Add regularization term to constrain the gain phase mean
+    :type gphase_reg: bool
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
+    in ants. See flt_ant_pos. Only required for tilt_reg = True.
+    :type ant_pos_arr: ndarray
     :param params: Parameters to constrain - redundant visibilities and gains
     (Amp & Phase components interweaved for both)
     :type params: ndarray
@@ -714,17 +721,28 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
     :rtype: float
     """
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
+    gain_comps = set_gref(gain_comps, ref_ant_idx, constr_phase, amp_constr, logamp)
+    gains = makeEArray(gain_comps)
     vis = makeEArray(vis_comps)
-    gains = makeEArray(set_gref(gain_comps, ref_ant_idx, constr_phase, \
-                                amp_constr, logamp))
-
     delta = obsvis - gVis(vis, credg, gains)
     nlog_likelihood = NLLFN[distribution](delta)
+    if tilt_reg or gphase_reg:
+        gphases = gain_comps[1::2]
+        if tilt_reg:
+            if ant_pos_arr is None:
+                raise ValueError('Input antenna position array to constrain tilts')
+            tilt_reg_pen = (np.square(np.sum(ant_pos_arr[:, 0]*gphases)) + \
+                            np.square(np.sum(ant_pos_arr[:, 1]*gphases)))/(np.pi/180)
+            nlog_likelihood += tilt_reg_pen
+        if gphase_reg:
+            gphase_reg_pen = np.square(gphases.mean())/(np.pi/180)
+            nlog_likelihood += gphase_reg_pen
     return nlog_likelihood
 
 
 def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_ant_idx=16, \
-               constr_phase=False, amp_constr='prod', bounded=False, logamp=False, \
+               op_ref_ant_idx=None, constr_phase=False, amp_constr='prod', bounded=False, \
+               logamp=False, tilt_reg=False, gphase_reg=False, ant_pos_arr=None, \
                initp=None, max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
@@ -744,7 +762,8 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     :type no_unq_bls: int
     :param no_ants: Number of antennas for given observation
     :type no_ants: int
-    :param ref_ant_idx: Index of reference antenna in ordered list of antennas.
+    :param refant_idx: Index of reference antenna that sets the average of
+    the gain amplitudes and/or phases to 0 in the ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
     :type ref_ant_idx: int
     :param distribution: Distribution assumption of noise under MLE {'gaussian',
@@ -761,6 +780,13 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     :param logamp: The logarithm of the amplitude initial parameters is taken,
     such that only positive solutions can be returned. Only if coords=="polar".
     :type logamp: bool
+    :param tilt_reg: Add regularization term to constrain tilt shifts to 0
+    :type tilt_reg: bool
+    :param gphase_reg: Add regularization term to constrain the gain phase mean
+    :type gphase_reg: bool
+    :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
+    in ants. See flt_ant_pos. Only required for tilt_reg = True.
+    :type ant_pos_arr: ndarray
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
@@ -784,7 +810,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
             if bounded:
                 print('Disregarding bounded argument in favour of logamp approach')
             if amp_constr == 'prod':
-                print('Constraining the mean of gain amplitudes to be 1 instead, '\
+                print('Constraining the mean of gain amplitudes to be 1 instead '\
                       'of the product, when logamp is True')
         else:
             xgamps = np.ones(no_ants-1) # gain amps
@@ -800,7 +826,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
 
     ff = jit(functools.partial(relative_nlogLklRP, credg, \
              distribution, obsvis, ref_ant_idx, no_unq_bls, constr_phase, \
-             amp_constr, logamp))
+             amp_constr, logamp, tilt_reg, gphase_reg, ant_pos_arr))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
@@ -947,7 +973,6 @@ def relative_nlogLklRPT(credg, distribution, obsvis, mrefant_idx, orefant_idx, \
     vis = makeEArray(vis_comps)
     delta = obsvis - gVis(vis, credg, gains)
     nlog_likelihood = NLLFN[distribution](delta)
-    nlog_likelihood
     if tilt_reg:
         gphases = gain_comps[1::2]
         tilt_reg_pen = (np.square(np.sum(ant_pos_arr[:, 0]*gphases)) + \
