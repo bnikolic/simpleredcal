@@ -64,6 +64,8 @@ def main():
     parser.add_argument('-a', '--ref_ant_idx', required=False, default=16, metavar='A', \
                         type=int, help='Reference antenna index to set the overall \
                         phase')
+    parser.add_argument('-l', '--logamp', required=False, action='store_true', \
+                        help='Use logamp method to force positive gain amplitudes')
     parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
                         type=str, help='Directory in which relative calibration \
                         results dataframes are located')
@@ -208,7 +210,8 @@ def main():
                         [len(slct_keys)-1:-2].values.astype(float), no_unq_bls)
                     res_opt = doOptCal(cRedG, cData[iter_dim], no_ants, ant_pos, \
                                        ant_sep, res_rel_vis, distribution=args.dist, \
-                                       ref_ant_idx=args.ref_ant_idx, initp=initp)
+                                       ref_ant_idx=args.ref_ant_idx, logamp=args.logamp, \
+                                       initp=initp)
                     res_opt = {key:res_opt[key] for key in slct_keys}
                     # get the new visibility solutions
                     w_alpha = get_w_alpha(res_rel_vis, res_opt['x'][-no_deg_params:])
