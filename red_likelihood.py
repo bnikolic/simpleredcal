@@ -450,8 +450,8 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
 
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
-             bounded=False, logamp=False, initp=None, norm_gains=False, tilt_reg=False, \
-             gphase_reg=False, ant_pos_arr=None, max_nit=1000, jax_minimizer=False):
+             bounded=False, logamp=False, norm_gains=False, tilt_reg=False, \
+             gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -480,8 +480,6 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :param logamp: The logarithm of the amplitude initial parameters is taken,
     such that only positive solutions can be returned. Only if coords=="polar".
     :type logamp: bool
-    :param initp: Initial parameter guesses for true visibilities and gains
-    :type initp: ndarray, None
     :param norm_gains: Normalize result gain amplitudes such that their mean is 1
     :type norm_gains: bool
     :param tilt_reg: Add regularization term to constrain tilt shifts to 0
@@ -491,6 +489,8 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
     :type ant_pos_arr: ndarray
+    :param initp: Initial parameter guesses for true visibilities and gains
+    :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
     :param jax_minimizer: Use jax minimization implementation - only if unbounded
@@ -741,9 +741,8 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, no_unq_bls, \
 
 
 def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_ant_idx=16, \
-               op_ref_ant_idx=None, constr_phase=False, amp_constr='prod', bounded=False, \
-               logamp=False, tilt_reg=False, gphase_reg=False, ant_pos_arr=None, \
-               initp=None, max_nit=1000, jax_minimizer=False):
+               constr_phase=False, amp_constr='prod', bounded=False, logamp=False, \
+               tilt_reg=False, gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=1000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -763,7 +762,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     :param no_ants: Number of antennas for given observation
     :type no_ants: int
     :param refant_idx: Index of reference antenna that sets the average of
-    the gain amplitudes and/or phases to 0 in the ordered list of antennas.
+    the gain amplitudes and/orphases to 0 in ordered list of antennas.
     Default is 16 (corresponding to antenna 55 in H1C_IDR2 dataset).
     :type ref_ant_idx: int
     :param distribution: Distribution assumption of noise under MLE {'gaussian',

@@ -28,8 +28,8 @@ import numpy
 from hera_cal.io import HERAData
 
 from fit_diagnostics import append_residuals_rel
-from red_likelihood import doRelCal, doRelCalRP, group_data, norm_rel_sols, \
-relabelAnts
+from red_likelihood import doRelCal, doRelCalRP, flt_ant_pos, group_data, \
+norm_rel_sols, relabelAnts
 from red_utils import find_flag_file, find_zen_file, fn_format, get_bad_ants, \
 mod_str_arg, new_fn
 
@@ -60,7 +60,7 @@ def main():
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to calibrate \
                         {0, 59}')
-    parser.add_argument('-f', '--flag_type', required=False, default=None, \
+    parser.add_argument('-f', '--flag_type', required=False, default='first', \
                         metavar='F', type=str, help='Flag type e.g. "first", \
                         "omni", "abs"')
     parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
@@ -69,6 +69,12 @@ def main():
     parser.add_argument('-m', '--method', required=False, default='cartesian', \
                         metavar='M', type=str, help='Method to use - {"cartesian", \
                         "polar", "RP"}, where RP stands for reduced parameters')
+    parser.add_argument('-l', '--logamp', required=False, action='store_true', \
+                        help='Use logamp method to force positive gain amplitudes')
+    parser.add_argument('-g', '--tilt_reg', required=False, action='store_true', \
+                        help='Add regularization term to constrain tilt shifts to 0')
+    parser.add_argument('-a', '--gphase_reg', required=False, action='store_true', \
+                        help='Add regularization term to constrain the gain phase mean')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new dataframe')
     args = parser.parse_args()
@@ -150,10 +156,15 @@ def main():
         cData = cData.data
 
         # to get fields for the csv header
-        no_ants = numpy.unique(RedG[:, 1:]).size
+        ants = numpy.unique(RedG[:, 1:])
+        no_ants = ants.size
         no_unq_bls = numpy.unique(RedG[:, 0]).size
         cRedG = relabelAnts(RedG)
         psize = (no_ants + no_unq_bls)*2
+        if args.tilt_reg:
+            ant_pos_arr = flt_ant_pos(hd.antpos, ants)
+        else:
+            ant_pos_arr = None
 
         # discarding 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
@@ -166,7 +177,8 @@ def main():
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
-        def cal(credg, distribution, coords, no_unq_bls, no_ants, obsvis, initp):
+        def cal(credg, distribution, coords, no_unq_bls, no_ants, logamp, \
+                tilt_reg, gphase_reg, ant_pos_arr, obsvis, initp):
             """Relative redundant calibration with doRelCal: unconstrained
             minimizer using cartesian coordinates - this is the fastest solver
 
@@ -183,6 +195,16 @@ def main():
             :type no_unq_bls: int
             :param no_ants: Number of antennas for given observation
             :type no_ants: int
+            :param logamp: The logarithm of the amplitude initial parameters is taken,
+            such that only positive solutions can be returned. Only if coords=="polar".
+            :type logamp: bool
+            :param tilt_reg: Add regularization term to constrain tilt shifts to 0
+            :type tilt_reg: bool
+            :param gphase_reg: Add regularization term to constrain the gain phase mean
+            :type gphase_reg: bool
+            :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
+            in ants. See flt_ant_pos.
+            :type ant_pos_arr: ndarray
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -194,15 +216,16 @@ def main():
             :rtype: Scipy optimization result object
             """
             res_rel = doRelCal(credg, obsvis, no_unq_bls, no_ants, coords=coords, \
-                               distribution=distribution, initp=initp)
+                               distribution=distribution, logamp=logamp, tilt_reg=tilt_reg, \
+                               gphase_reg=gphase_reg, ant_pos_arr=ant_pos_arr, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
-            res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls, coords=coords)
             # use solution for next solve in iteration
             if res_rel['success']:
                 initp = res_rel['x']
             return res_rel, initp
 
-        def cal_RP(credg, distribution, obsvis, no_unq_bls, no_ants, initp):
+        def cal_RP(credg, distribution, no_unq_bls, no_ants, logamp, \
+                   tilt_reg, gphase_reg, ant_pos_arr, obsvis, initp):
             """Relative redundant calibration with doRelCalRP: constrained
             minimizer (by reducing the number of parameters) using polar
             coordinates
@@ -217,6 +240,16 @@ def main():
             :type no_unq_bls: int
             :param no_ants: Number of antennas for given observation
             :type no_ants: int
+            :param logamp: The logarithm of the amplitude initial parameters is taken,
+            such that only positive solutions can be returned. Only if coords=="polar".
+            :type logamp: bool
+            :param tilt_reg: Add regularization term to constrain tilt shifts to 0
+            :type tilt_reg: bool
+            :param gphase_reg: Add regularization term to constrain the gain phase mean
+            :type gphase_reg: bool
+            :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
+            in ants. See flt_ant_pos.
+            :type ant_pos_arr: ndarray
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
@@ -229,7 +262,9 @@ def main():
             """
             res_rel, initp_ = doRelCalRP(credg, obsvis, no_unq_bls, no_ants, \
                                          distribution=distribution, constr_phase=True, \
-                                         bounded=True, initp=initp)
+                                         amp_constr='prod', bounded=True, logamp=logamp, \
+                                         tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
+                                         ant_pos_arr=gphase_reg, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -237,11 +272,14 @@ def main():
             return res_rel, initp
 
         if args.method.upper() == 'RP':
-            RelCal = functools.partial(cal_RP, cRedG, args.dist, no_unq_bls, no_ants)
+            RelCal = functools.partial(cal_RP, cRedG, args.dist, no_unq_bls, no_ants, \
+                                       args.logamp, args.tilt_reg, args.gphase_reg, \
+                                       ant_pos_arr)
             coords = 'polar'
         else:
             RelCal = functools.partial(cal, cRedG, args.dist, args.method, no_unq_bls, \
-                                       no_ants)
+                                       no_ants, args.logamp, args.tilt_reg, \
+                                       args.gphase_reg, ant_pos_arr)
             coords = args.method
 
         stdout = io.StringIO()
