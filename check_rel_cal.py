@@ -35,8 +35,8 @@ def main():
     with vanilla initial parameter guesses of 1+1j for the gains and 0+0j for
     the visibilities, and verifies if these results match with the original
     results by checking both their negative log-likelhoods and their gain
-    amplitudes. We expect these to match, but we do not expect the gains and
-    visibility solutions to be equal, since there are still some additional
+    amplitudes. We expect these to match, but we do not expect the gain and
+    visibility solution phases to be equal, since there are still some additional
     degeneracies (overall phase & tilt shifts) that have not been accounted for.
 
     Returns a pickled pandas dataframe of the Scipy optimization results for
@@ -122,9 +122,9 @@ def main():
                 writer.writeheader()
                 for iter_dim in rnd_idxs:
                     res_rel = doRelCal(cRedG, cData[fmap[iter_dim[0]], iter_dim[1]], \
-                                       no_unq_bls, no_ants, distribution=dist)
+                                       no_unq_bls, no_ants, coords='cartesian', \
+                                       distribution=dist, norm_gains=True)
                     res_rel = {key:res_rel[key] for key in slct_keys}
-                    res_rel['x'] = norm_rel_sols(res_rel['x'], no_unq_bls)
 
                     # checking results
                     res_rel[match_keys[0]] = numpy.abs(norm_residuals(rel_df.\
@@ -135,7 +135,6 @@ def main():
                                            no_unq_bls)[1])
                     res_rel[match_keys[1]] = (numpy.abs(norm_residuals(res_gamp, \
                                               check_gamp)) < args.tol).all()
-
 
                     # expanding out the solution
                     for i, param in enumerate(res_rel['x']):
