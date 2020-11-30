@@ -977,6 +977,8 @@ def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, \
     rel_gain_comps, deg_params = np.split(params, [2*no_ants,])
     if logamp:
         rel_gain_comps = exp_amps(rel_gain_comps)
+        o_amp, deg_rest = np.split(deg_params, [1,])
+        deg_params = np.hstack([np.exp(o_amp), deg_rest])
     rel_gains = makeEArray(rel_gain_comps)
     w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
     delta = obsvis - gVis(w_alpha, credg, rel_gains)
@@ -1116,25 +1118,25 @@ def doOptCal(credg, obsvis, no_ants, ant_pos_arr, ant_sep, rel_vis, distribution
     """
     if initp is None:
         # set up initial parameters
-        # gain amplitudes
         if logamp:
-            xgamps = np.zeros(no_ants)
+            xgamps = np.zeros(no_ants) # gain amplitudes
+            xdegparams = np.zeros(4) # overall amplitude, tilts
         else:
-            xgamps = np.ones(no_ants)
+            xgamps = np.ones(no_ants) # gain amplitudes
+            xdegparams = np.array([1., 0., 0., 0.]) # overall amplitude, tilts
         xgphases = np.zeros(no_ants) # gain phases
         xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
-        xdegparams = np.zeros(4) # overall amplitude, overall phase,
-        # and phase gradients in x and y
-        initp= numpy.hstack([xgains, *xdegparams])
+        initp = np.hstack([xgains, xdegparams])
 
     lb = numpy.repeat(-np.inf, initp.size)
     ub = numpy.repeat(np.inf, initp.size)
     if not logamp:
         lb[:no_ants*2:2] = 0 # lower bound for gain amplitudes
+        lb[-4] = 0 # lower bound for overall amplitude
+        bounds = Bounds(lb, ub)
     else:
+        bounds = None
         print('Disregarding bounds on amplitudes as using logamp method')
-    lb[-4] = 0 # lower bound for overall amplitude
-    bounds = Bounds(lb, ub)
 
     # constraints for optimization
     constraints = Opt_Constraints(no_ants, ref_ant_idx, ant_pos_arr, logamp)
@@ -1156,6 +1158,8 @@ def doOptCal(credg, obsvis, no_ants, ant_pos_arr, ant_sep, rel_vis, distribution
     if logamp:
         rel_gain_comps, deg_params = np.split(res['x'], [2*no_ants,])
         rel_gain_comps = exp_amps(rel_gain_comps)
+        o_amp, deg_rest = np.split(deg_params, [1,])
+        deg_params = np.hstack([np.exp(o_amp), deg_rest])
         res['x'] = np.hstack([rel_gain_comps, deg_params])
     return res
 
