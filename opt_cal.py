@@ -177,7 +177,7 @@ def main():
         psize = no_ants*2 + no_deg_params + no_unq_bls*2
         header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
-        ant_pos = flt_ant_pos(hd.antpos, ants)
+        ant_pos_arr = flt_ant_pos(hd.antpos, ants)
         ant_sep = red_ant_sep(RedG, hd.antpos)
 
         def get_w_alpha(res_rel_vis, new_deg_params):
@@ -208,7 +208,7 @@ def main():
                     rel_idim = (freq_chans[iter_dim[0]], time_ints[iter_dim[1]])
                     res_rel_vis, _ = split_rel_results(rel_df.loc[rel_idim]\
                         [len(slct_keys)-1:-2].values.astype(float), no_unq_bls)
-                    res_opt = doOptCal(cRedG, cData[iter_dim], no_ants, ant_pos, \
+                    res_opt = doOptCal(cRedG, cData[iter_dim], no_ants, ant_pos_arr, \
                                        ant_sep, res_rel_vis, distribution=args.dist, \
                                        ref_ant_idx=args.ref_ant_idx, logamp=args.logamp, \
                                        initp=initp)
