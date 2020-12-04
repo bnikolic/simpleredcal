@@ -451,7 +451,8 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
              bounded=False, logamp=False, norm_gains=False, tilt_reg=False, \
-             gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=1000, jax_minimizer=False):
+             gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=1000, \
+             return_initp=False, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -493,6 +494,8 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :type initp: ndarray, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
+    :param return_initp: Return optimization parameters that can be reused
+    :type return_initp: bool
     :param jax_minimizer: Use jax minimization implementation - only if unbounded
     :type jax_minimizer: bool
 
@@ -551,6 +554,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
         res = minimize(ff, initp, bounds=bounds, method=method, \
                        jac=jac, hess=hess, options={'maxiter':max_nit})
     print(res['message'])
+    if return_initp:
+        # to reuse parameters
+        initp = numpy.copy(res['x'])
     if logamp and coords == 'polar':
         # transforming gain amplitudes back
         vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
@@ -562,7 +568,11 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                   'negative gain amplitudes were found.')
         else:
             res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords=coords)
-    return res
+    if return_initp:
+        retn = res, initp
+    else:
+        retn = res
+    return retn
 
 
 def rotate_phase(rel_resx, no_unq_bls, principle_angle=False, norm_gains=False):

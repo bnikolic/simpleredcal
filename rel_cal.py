@@ -215,13 +215,14 @@ def main():
             visibilities
             :rtype: Scipy optimization result object
             """
-            res_rel = doRelCal(credg, obsvis, no_unq_bls, no_ants, coords=coords, \
-                               distribution=distribution, logamp=logamp, tilt_reg=tilt_reg, \
-                               gphase_reg=gphase_reg, ant_pos_arr=ant_pos_arr, initp=initp)
+            res_rel, initp_new = doRelCal(credg, obsvis, no_unq_bls, no_ants, coords=coords, \
+                distribution=distribution, logamp=logamp, tilt_reg=tilt_reg, \
+                gphase_reg=gphase_reg, ant_pos_arr=ant_pos_arr, initp=initp, \
+                return_initp=True)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
-                initp = res_rel['x']
+                initp = initp_new
             return res_rel, initp
 
         def cal_RP(credg, distribution, no_unq_bls, no_ants, logamp, \
