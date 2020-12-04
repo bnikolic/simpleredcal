@@ -12,6 +12,7 @@
 #PBS -l nodes=1:ppn=2 # default is 1 core on 1 node
 #PBS -l walltime=48:00:00
 #PBS -j oe
-#PBS -o rel_cal.2458099.43124.ee.gaussian.out
+#PBS -o rel_cal.2458098.43869.ee.gaussian.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py 2458099.43124 --pol 'ee' --flag_type 'first' --dist gaussian
+/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py 2458098.43869 --pol 'ee' --flag_type 'first' \
+--dist 'gaussian' --method 'polar' --logamp --tilt_reg --gphase_reg
