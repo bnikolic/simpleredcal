@@ -451,7 +451,7 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
              bounded=False, logamp=False, norm_gains=False, tilt_reg=False, \
-             gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=1000, \
+             gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=2000, \
              return_initp=False, jax_minimizer=False):
     """Do relative step of redundant calibration
 
