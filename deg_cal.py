@@ -62,6 +62,9 @@ def main():
     parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
+    parser.add_argument('-m', '--coords', required=False, default='polar', \
+                        metavar='M', type=str, help='Coordinates used for rel cal \
+                        results - {"cartesian", "polar"}')
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
                         type=int, help='JD day for fitting across JDs - only if \
                         deg_dim = "jd". Default to pick consecutive JD day')
@@ -233,8 +236,8 @@ def main():
                     .values.astype(float)
                     resx2 = rel_df_c.loc[iter_dim[b], iter_dim[d]][len(slct_keys)-1:-2]\
                     .values.astype(float)
-                    rel_vis1, _ = split_rel_results(resx1, no_unq_bls)
-                    rel_vis2, _ = split_rel_results(resx2, no_unq_bls)
+                    rel_vis1, _ = split_rel_results(resx1, no_unq_bls, coords=args.coords)
+                    rel_vis2, _ = split_rel_results(resx2, no_unq_bls, coords=args.coords)
 
                     res_deg = doDegVisVis(ant_sep, rel_vis1, rel_vis2, \
                                           distribution=args.dist, initp=initp)
