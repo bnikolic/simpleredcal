@@ -98,10 +98,12 @@ def clip_ylim(df, col, clip_pctile, pos='top'):
             values = values[values != numpy.inf]
         if -numpy.inf in values:
             values = values[values != -numpy.inf]
+        if numpy.nan in values:
+            values = values[values != numpy.nan]
         if (values < 0).any():
             ref = numpy.nanpercentile(values, 85)
         else:
-            ref = numpy.median(values)
+            ref = numpy.nanmedian(values)
         rnd_base = 10**-numpy.floor(numpy.log10(ref))
         ylim = pos_dict[pos](numpy.nanpercentile(values, \
                              clip_pctile)*rnd_base)/rnd_base
@@ -187,7 +189,7 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
     if ylabel == '':
         ylabel = col
     if (~df['success']).any():
-        pgbmax = round(numpy.max(df[col][~df['success']].values), 3)
+        pgbmax = round(numpy.nanmax(df[col][~df['success']].values), 3)
     else:
         pgbmax = 'n/a - all minimizations were succesful'
     print('Max {} for minimizations with {}=False: {}\n'.format(ylabel, \
