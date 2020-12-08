@@ -790,7 +790,7 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, op_ref_ant_idx,
 def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_ant_idx=16, \
                op_ref_ant_idx=None, constr_phase=False, amp_constr='prod', bounded=False, \
                logamp=False, tilt_reg=False, gphase_reg=False, ant_pos_arr=None, \
-               initp=None, max_nit=1000, jax_minimizer=False):
+               initp=None, max_nit=2000, jax_minimizer=False):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -896,14 +896,8 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
         if bounded and not logamp:
             lb = numpy.repeat(-np.inf, initp.size)
             ub = numpy.repeat(np.inf, initp.size)
-            lb[:2*(no_unq_bls):2] = 0 # lower bound for gain amps
-            # lb[:2*(no_unq_bls+no_ants-1):2] = 0 # lower bound for gain and
-            # vis amps - vis amp boundary found to be unnecessary and takes longer
+            lb[:2*(no_unq_bls+no_ants-1):2] = 0 # lower bound for gain and vis amps
             bounds = Bounds(lb, ub)
-            # method = 'L-BFGS-B' # get b'ABNORMAL_TERMINATION_IN_LNSRCH'
-            # jac = lambda x: numpy.array(jacrev(ff)(x))
-            # hess = None
-            # max_nit = min(15000, max_nit)
             method = 'trust-constr'
             jac = None
             hess = jacfwd(jacrev(ff))
