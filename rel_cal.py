@@ -215,10 +215,10 @@ def main():
             visibilities
             :rtype: Scipy optimization result object
             """
-            res_rel, initp_new = doRelCal(credg, obsvis, no_unq_bls, no_ants, coords=coords, \
-                distribution=distribution, logamp=logamp, tilt_reg=tilt_reg, \
-                gphase_reg=gphase_reg, ant_pos_arr=ant_pos_arr, initp=initp, \
-                return_initp=True)
+            res_rel, initp_new = doRelCal(credg, obsvis, no_unq_bls, no_ants, \
+                coords=coords, distribution=distribution, norm_gains=True, \
+                logamp=logamp, tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
+                ant_pos_arr=ant_pos_arr, initp=initp, return_initp=True)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -262,10 +262,9 @@ def main():
             :rtype: Scipy optimization result object
             """
             res_rel, initp_ = doRelCalRP(credg, obsvis, no_unq_bls, no_ants, \
-                                         distribution=distribution, constr_phase=True, \
-                                         amp_constr='prod', bounded=True, logamp=logamp, \
-                                         tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
-                                         ant_pos_arr=gphase_reg, initp=initp)
+                distribution=distribution, constr_phase=True, amp_constr='prod', \
+                bounded=True, logamp=logamp, tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
+                ant_pos_arr=gphase_reg, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
