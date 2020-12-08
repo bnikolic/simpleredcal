@@ -63,7 +63,7 @@ def main():
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
-                        type=float, help='JD day for fitting across JDs - only if \
+                        type=int, help='JD day for fitting across JDs - only if \
                         deg_dim = "jd". Default to pick consecutive JD day')
     parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
                         type=str, help='Directory in which relative calibration \
