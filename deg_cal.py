@@ -55,6 +55,9 @@ def main():
     parser.add_argument('-x', '--deg_dim', required=True, metavar='X', type=str, \
                         help='Which dimension to compare relatively calibrated \
                         visibility solutions {"tint", "freq", "jd"}')
+    parser.add_argument('-m', '--coords', required=True, default='polar', \
+                        metavar='M', type=str, help='Coordinates used for rel cal \
+                        results - {"cartesian", "polar"}')
     parser.add_argument('-c', '--chans', required=False, default=None, metavar='C', \
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
@@ -62,9 +65,6 @@ def main():
     parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
-    parser.add_argument('-m', '--coords', required=False, default='polar', \
-                        metavar='M', type=str, help='Coordinates used for rel cal \
-                        results - {"cartesian", "polar"}')
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
                         type=int, help='JD day for fitting across JDs - only if \
                         deg_dim = "jd". Default to pick consecutive JD day')
