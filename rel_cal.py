@@ -30,8 +30,8 @@ from hera_cal.io import HERAData
 from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCal, doRelCalRP, flt_ant_pos, group_data, \
 norm_rel_sols, relabelAnts
-from red_utils import find_flag_file, find_zen_file, fn_format, get_bad_ants, \
-mod_str_arg, new_fn
+from red_utils import find_flag_file, find_nearest, find_rel_df, find_zen_file, \
+fn_format, get_bad_ants, match_lst, mod_str_arg, new_fn
 
 
 def main():
@@ -75,6 +75,8 @@ def main():
                         help='Add regularization term to constrain tilt shifts to 0')
     parser.add_argument('-a', '--gphase_reg', required=False, action='store_true', \
                         help='Add regularization term to constrain the gain phase mean')
+    parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
+                        type=int, help='JD of to find datasets to reuse initial parameters')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new dataframe')
     args = parser.parse_args()
@@ -176,6 +178,37 @@ def main():
             print('Flagged channels for visibility dataset {} are: {}\n'.\
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
+
+
+        if args.initp_jd is not None:
+            jd_time2 = match_lst(args.jd_time, args.initp_jd)
+            rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist)
+
+            last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+            last1 = last_df[last_df['JD_time'] == args.jd_time]['LASTs'].values[0]
+            last2 = last_df[last_df['JD_time'] == jd_time2]['LASTs'].values[0]
+            _, offset = find_nearest(last2, last1[0])
+
+            rel_df1 = pd.read_pickle(rel_df_path1)
+            rel_df1 = rel_df1[rel_df1.index.get_level_values('time_int') >= offset]
+
+            next_row = numpy.where(last_df['JD_time'] == jd_time2)[0][0] + 1
+            rel_df_path2 = find_rel_df(last_df.iloc[next_row]['JD_time'], args.pol, \
+                                       args.dist)
+            rel_df2 = pd.read_pickle(rel_df_path2)
+            rel_df2 = rel_df2[rel_df2.index.get_level_values('time_int') < offset]
+
+            rel_df_c = pd.concat([rel_df1, rel_df2])
+
+            # filter by specified channels and time integrations
+            time_ints_offset = (time_ints + offset) % hd.Ntimes
+            freq_flt = numpy.in1d(rel_df_c.index.get_level_values('freq'), freq_chans)
+            tint_flt = numpy.in1d(rel_df_c.index.get_level_values('time_int'), time_ints_offset)
+            rel_df_c = rel_df_c[freq_flt & tint_flt]
+
+            time_ints2 = rel_df_c.index.get_level_values('time_int').values
+            iter_dims = [idim+(tint,) for idim, tint in zip(iter_dims, time_ints2)]
+
 
         def cal(credg, distribution, coords, no_unq_bls, no_ants, logamp, \
                 tilt_reg, gphase_reg, ant_pos_arr, obsvis, initp):
@@ -290,12 +323,15 @@ def main():
                     writer.writeheader()
                 initp = None
                 for i, iter_dim in enumerate(iter_dims):
-                    res_rel, initp = RelCal(cData[iter_dim], initp)
+                    if args.initp_jd is not None:
+                        initp = rel_df_c.loc[(freq_chans[iter_dim[0]], iter_dim[2])]\
+                                [len(slct_keys[:-1]):-2].values.astype(float)
+                    res_rel, initp = RelCal(cData[iter_dim[:2]], initp)
                     # expanding out the solution
                     for j, param in enumerate(res_rel['x']):
                         res_rel[j] = param
                     # reset initp after each frequency slice
-                    if not (i+1)%no_tints:
+                    if not (i+1)%no_tints and args.initp_jd is None:
                         initp = None
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
@@ -306,8 +342,7 @@ def main():
         df = pd.read_csv(out_csv)
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
-        df = append_residuals_rel(df, cData, cRedG, coords, \
-                                  out_fn=None)
+        df = append_residuals_rel(df, cData, cRedG, coords, out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
