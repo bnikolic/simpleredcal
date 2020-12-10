@@ -382,8 +382,30 @@ NLLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
 makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
 
+def insert_gref(gain_comps, ref_ant_idx):
+    """Insert 0 gain phase for reference antenna in gain phase array
+
+    :param gain_comps: Gain component array where amplitude and phase components
+    are adjacent
+    :type gain_comps: ndarray
+    :param ref_ant_idx: Index of reference antenna to set gain phase to 0 - polar
+    coordinate system only.
+    :type ref_ant_idx: int, None
+
+    :return: Gain component array where amplitude and phase components are adjacent
+    :rtype: ndarray
+    """
+    gamps = gain_comps[::2]
+    gphases = gain_comps[1::2]
+    gphase1, gphase2 = np.split(gphases, [ref_ant_idx])
+    gphaseref = 0. # set the phase of the reference antenna to be 0
+    gphases = np.hstack([gphase1, gphaseref, gphase2])
+    gain_comps = np.ravel(np.vstack((gamps, gphases)), order='F')
+    return gain_comps
+
+
 def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
-                     lovamp, tilt_reg, gphase_reg, ant_pos_arr, params):
+                     lovamp, tilt_reg, gphase_reg, ant_pos_arr, ref_ant_idx, params):
     """Redundant relative negative log-likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -420,6 +442,9 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos.
     :type ant_pos_arr: ndarray
+    :param ref_ant_idx: Index of reference antenna to set gain phase to 0 - polar
+    coordinate system only.
+    :type ref_ant_idx: int, None
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im [cartesian] or Amp & Phase [polar] components interweaved for both)
     :type params: ndarray
@@ -428,6 +453,8 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     :rtype: float
     """
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
+    if ref_ant_idx is not None:
+        gain_comps = insert_gref(gain_comps, ref_ant_idx)
     # transforming gain amplitudes to force positive results
     if logamp:
         gain_comps = exp_amps(gain_comps)
@@ -456,7 +483,7 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
              bounded=False, logamp=False, lovamp=False, norm_gains=False, tilt_reg=False, \
-             gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=2000, \
+             gphase_reg=False, ant_pos_arr=None, ref_ant_idx=None, initp=None, max_nit=2000, \
              return_initp=False, jax_minimizer=False):
     """Do relative step of redundant calibration
 
@@ -500,6 +527,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :type ant_pos_arr: ndarray
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
+    :param ref_ant_idx: Index of reference antenna to set gain phase to 0 - polar
+    coordinate system only.
+    :type ref_ant_idx: int, None
     :param max_nit: Maximum number of iterations to perform
     :type max_nit: int
     :param return_initp: Return optimization parameters that can be reused
@@ -520,29 +550,36 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                 print('Bounds not needed for cartesian coordinate approach')
             if logamp:
                 print('logamp method not applicable for cartesian coordinate approach')
+            initp = np.hstack([xvis, xgains])
         elif coords == 'polar': # (Amp & Phase components)
             xvphases = np.zeros(no_unq_bls)
-            xgphases = np.zeros(no_ants)
+            xgphases = np.zeros(no_ants-1)
             if logamp:
-                xgamps = np.zeros(no_ants)
+                xgamps = np.zeros(no_ants-1)
+                add_amp = 0.
                 if bounded:
                     print('Disregarding bounded argument in favour of logamp approach')
             else:
-                xgamps = np.ones(no_ants)
+                xgamps = np.ones(no_ants-1)
+                add_amp = 1.
             if lovamp:
                 xvamps = np.repeat(-3., no_unq_bls)
             else:
                 xvamps = np.ones(no_unq_bls)
             xvis = np.ravel(np.vstack((xvamps, xvphases)), order='F')
             xgains = np.ravel(np.vstack((xgamps, xgphases)), order='F')
+            initp = np.hstack([xvis, xgains])
+            initp = np.append(initp, np.array([add_amp])) # add back a gain amplitude
+            if ref_ant_idx is None:
+                initp = np.append(initp, np.array([0.])) # add back a gphase param
         else:
             raise ValueError('Specify a correct coordinate system: {"cartesian", \
                              "polar"}')
-        initp = np.hstack([xvis, xgains])
+
 
     ff = jit(functools.partial(relative_nlogLkl, credg, distribution, obsvis, \
                                no_unq_bls, coords, logamp, lovamp, tilt_reg, gphase_reg, \
-                               ant_pos_arr))
+                               ant_pos_arr, ref_ant_idx))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
@@ -568,9 +605,11 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     if return_initp:
         # to reuse parameters
         initp = numpy.copy(res['x'])
-    if (logamp or lovamp) and coords == 'polar':
-        # transforming gain amplitudes back
+    if (logamp or lovamp or ref_ant_idx is not None) and coords == 'polar':
         vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
+        if ref_ant_idx is not None:
+            gain_comps = insert_gref(gain_comps, ref_ant_idx)
+        # transforming gain amplitudes back
         if logamp:
             gain_comps = exp_amps(gain_comps)
         if lovamp:
