@@ -206,8 +206,12 @@ def main():
             tint_flt = numpy.in1d(rel_df_c.index.get_level_values('time_int'), time_ints_offset)
             rel_df_c = rel_df_c[freq_flt & tint_flt]
 
-            time_ints2 = rel_df_c.index.get_level_values('time_int').values
+            time_ints2 = numpy.tile(rel_df_c.index.get_level_values('time_int').unique().values, freq_chans.size)
             iter_dims = [idim+(tint,) for idim, tint in zip(iter_dims, time_ints2)]
+
+            phase_reg_initp = True
+        else:
+            phase_reg_initp = False
 
 
         def cal(credg, distribution, coords, no_unq_bls, no_ants, logamp, \
@@ -251,7 +255,8 @@ def main():
             res_rel, initp_new = doRelCal(credg, obsvis, no_unq_bls, no_ants, \
                 coords=coords, distribution=distribution, norm_gains=True, \
                 logamp=logamp, tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
-                ant_pos_arr=ant_pos_arr, initp=initp, return_initp=True)
+                ant_pos_arr=ant_pos_arr, initp=initp, return_initp=True, \
+                phase_reg_initp=phase_reg_initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:

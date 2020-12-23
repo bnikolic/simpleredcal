@@ -404,8 +404,32 @@ def insert_gref(gain_comps, ref_ant_idx):
     return gain_comps
 
 
+def split_rel_results(resx, no_unq_bls, coords='cartesian'):
+    """Split the real results array from relative calibration minimization into
+    complex visibility and gains arrays
+
+    :param resx: Optimization result for the solved antenna gains and true sky
+    visibilities
+    :type resx: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param coords: Coordinate system in which gain and visibility parameters
+    have been set up
+    :type coords: str {"cartesian", "polar"}
+
+    :return: Tuple of visibility and gain solution arrays
+    :rtype: tuple
+    """
+    cfun = {'cartesian':makeCArray, 'polar':makeEArray}
+    vis_params, gains_params = numpy.split(resx, [no_unq_bls*2,])
+    res_vis = cfun[coords](vis_params)
+    res_gains = cfun[coords](gains_params)
+    return res_vis, res_gains
+
+
 def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
-                     lovamp, tilt_reg, gphase_reg, ant_pos_arr, ref_ant_idx, params):
+                     lovamp, tilt_reg, gphase_reg, ant_pos_arr, ref_ant_idx, phase_reg_initp, params):
     """Redundant relative negative log-likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -478,13 +502,18 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
         if gphase_reg:
             gphase_reg_pen = np.square(gphases.mean())/(np.pi/180)
             nlog_likelihood += gphase_reg_pen
+    if phase_reg_initp is not None:
+        visr, gainsr = split_rel_results(phase_reg_initp, no_unq_bls, coords=coords)
+        # deltaa = (np.angle(visr) - np.angle(vis) + np.pi) % (2*np.pi) - np.pi
+        deltaa = (np.angle(gainsr) - np.angle(gains) + np.pi) % (2*np.pi) - np.pi
+        nlog_likelihood += np.sum(np.square(deltaa))
     return nlog_likelihood
 
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
              bounded=False, logamp=False, lovamp=False, norm_gains=False, tilt_reg=False, \
              gphase_reg=False, ant_pos_arr=None, ref_ant_idx=None, initp=None, max_nit=2000, \
-             return_initp=False, jax_minimizer=False):
+             return_initp=False, jax_minimizer=False, phase_reg_initp=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j for both the gains
@@ -576,10 +605,14 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             raise ValueError('Specify a correct coordinate system: {"cartesian", \
                              "polar"}')
 
+    if phase_reg_initp:
+        phase_reg_initp = initp
+    else:
+        phase_reg_initp = None
 
     ff = jit(functools.partial(relative_nlogLkl, credg, distribution, obsvis, \
                                no_unq_bls, coords, logamp, lovamp, tilt_reg, gphase_reg, \
-                               ant_pos_arr, ref_ant_idx))
+                               ant_pos_arr, ref_ant_idx, phase_reg_initp))
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
