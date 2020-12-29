@@ -10,8 +10,8 @@
 #PBS -d /lustre/aoc/projects/hera/mmolnar/simpleredcal # Working directory (PBS_O_WORKDIR) set to your Lustre area
 #PBS -m bea # Send email when Jobs end or abort
 #PBS -l nodes=1:ppn=4 # default is 1 core on 1 node
-#PBS -l walltime=48:00:00
+#PBS -l walltime=12:00:00
 #PBS -j oe
-#PBS -o deg_cal.2458098.43869.ee.jd.2458099.cauchy.out
+#PBS -o deg_cal.2458098.43869.ee.jd.2458099.gaussian.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python deg_cal.py 2458098.43869 --deg_dim jd --pol ee --dist cauchy
+/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python deg_cal.py 2458098.43869 --deg_dim 'jd' --pol 'ee' --dist 'gaussian' --coords 'cartesian'
