@@ -345,6 +345,12 @@ def main():
 
         print('Relative calibration results saved to csv file {}'.format(out_csv))
         df = pd.read_csv(out_csv)
+        if csv_exists:
+            freqs = df['freq'].unique()
+            tints = df['time_int'].unique()
+            if cData.shape[0] != freqs.size or cData.shape[1] != tints.size:
+                _, _, cData = group_data(zen_fn, args.pol, freqs, tints, \
+                                         bad_ants, flag_path=flag_fn)
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
         df = append_residuals_rel(df, cData, cRedG, coords, out_fn=None)
