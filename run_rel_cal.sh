@@ -10,9 +10,9 @@
 #PBS -d /lustre/aoc/projects/hera/mmolnar/simpleredcal # Working directory (PBS_O_WORKDIR) set to your Lustre area
 #PBS -m bea # Send email when Jobs end or abort
 #PBS -l nodes=1:ppn=4 # default is 1 core on 1 node
-#PBS -l walltime=80:00:00
+#PBS -l walltime=100:00:00
 #PBS -j oe
 #PBS -o rel_cal.2458098.43869.ee.gaussian.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py 2458098.43869 --pol 'ee' --flag_type 'first' \
---dist 'gaussian' --method 'cartesian'
+/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py 2458098.43869 --pol 'ee' \
+--flag_type 'first' --dist 'gaussian'
