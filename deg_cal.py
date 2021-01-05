@@ -1,8 +1,8 @@
-"""Batch degenerate parameter fitting between relatively calibrated visibilities
+"""Batch degenerate parameter solver between relatively calibrated visibilities
 across LAST, frequency, or JD
 
 example run:
-$ python deg_cal.py 2458098.43869 --deg_dim freq --pol ee --chans 300~301 --tints 10~11
+$ python deg_cal.py 2458098.43869 --deg_dim 'freq' --pol 'ee' --chans 300~301 --tints 10~11
 
 Can then read the results dataframe with:
 > pd.read_pickle('deg_df.2458098.43869.ee.freq.cauchy.pkl')
@@ -55,14 +55,14 @@ def main():
     parser.add_argument('-x', '--deg_dim', required=True, metavar='X', type=str, \
                         help='Which dimension to compare relatively calibrated \
                         visibility solutions {"tint", "freq", "jd"}')
-    parser.add_argument('-m', '--coords', required=True, default='polar', \
+    parser.add_argument('-m', '--coords', required=False, default='cartesian', \
                         metavar='M', type=str, help='Coordinates used for rel cal \
                         results - {"cartesian", "polar"}')
     parser.add_argument('-c', '--chans', required=False, default=None, metavar='C', \
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to fit {0, 59}')
-    parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
+    parser.add_argument('-d', '--dist', required=True, default='cauchy', metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-j', '--tgt_jd', required=False, default=None, metavar='J', \
@@ -124,10 +124,10 @@ def main():
         ptints = '0~{}'.format(md['Ntimes']-1)
     pdict = {'freq':'frequency channels', 'tint':'time integrations', \
              'jd':'Julian days'}
-    print('Running degenerate fitting on adjacent {} for visibility dataset {} '\
-          'for frequency channel(s) {} and time integration(s) {}\n'.\
-          format(pdict[args.deg_dim], os.path.basename(find_zen_file(args.jd_time)), \
-          pchans, ptints))
+    print('Running degenerate translation on adjacent {} for visibility dataset {} '\
+          'for frequency channel(s) {} and time integration(s) {} with {} '\
+          'assumed noise distribution\n'.format(pdict[args.deg_dim], \
+          os.path.basename(find_zen_file(args.jd_time)), pchans, ptints, args.dist))
 
     if freq_chans is None:
         freq_chans = numpy.arange(md['Nfreqs'])
