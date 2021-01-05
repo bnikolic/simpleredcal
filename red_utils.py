@@ -366,6 +366,8 @@ def mod_str_arg(str_arg):
         out = list(map(int, str_arg.split('~')))
         if len(out) > 1:
             out = numpy.arange(out[0], out[1]+1)
+        else:
+            out = numpy.array(out)
     else:
         out = None
     return out
