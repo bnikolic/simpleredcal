@@ -7,6 +7,7 @@ import functools
 import numpy
 from matplotlib import pyplot as plt
 from scipy.optimize import Bounds, minimize
+from scipy.special import gamma
 from scipy.stats import circmean
 
 import hera_cal
@@ -377,7 +378,10 @@ def gVis(vis, credg, gains):
 
 # Negative log-likelihood calculation
 NLLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
-         'gaussian':lambda delta: np.square(np.abs(delta)).sum()}
+         'gaussian':lambda delta: np.square(np.abs(delta)).sum(),
+         't':lambda dn: (-np.log(gamma(0.5*(dn[1] + 1))) + 0.5*np.log(np.pi * dn[1]) \
+         + np.log(gamma(0.5*dn[1])) + 0.5*(dn[1] + 1)*(np.log(1 + (1/dn[1])*np.\
+         square(np.abs(dn[0]))))).sum()}
 
 makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
@@ -491,6 +495,9 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     vis = makeC[coords](vis_comps)
     gains = makeC[coords](gain_comps)
     delta = obsvis - gVis(vis, credg, gains)
+    if 't.' in distribution:
+        delta = delta, int(distribution.split('.')[-1])
+        distribution = 't'
     nlog_likelihood = NLLFN[distribution](delta)
     if tilt_reg or gphase_reg:
         if coords == 'cartesian':
