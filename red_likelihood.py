@@ -429,7 +429,8 @@ def split_rel_results(resx, no_unq_bls, coords='cartesian'):
 
 
 def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
-                     lovamp, tilt_reg, gphase_reg, ant_pos_arr, ref_ant_idx, phase_reg_initp, params):
+                     lovamp, tilt_reg, gphase_reg, ant_pos_arr, ref_ant_idx, \
+                     phase_reg_initp, params):
     """Redundant relative negative log-likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -469,6 +470,9 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     :param ref_ant_idx: Index of reference antenna to set gain phase to 0 - polar
     coordinate system only.
     :type ref_ant_idx: int, None
+    :param phase_reg_initp: Add regularization term to constrain the phases to be
+    the same as the ones from the initial parameters
+    :type phase_reg_initp: bool
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im [cartesian] or Amp & Phase [polar] components interweaved for both)
     :type params: ndarray
@@ -504,7 +508,6 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
             nlog_likelihood += gphase_reg_pen
     if phase_reg_initp is not None:
         visr, gainsr = split_rel_results(phase_reg_initp, no_unq_bls, coords=coords)
-        # deltaa = (np.angle(visr) - np.angle(vis) + np.pi) % (2*np.pi) - np.pi
         deltaa = (np.angle(gainsr) - np.angle(gains) + np.pi) % (2*np.pi) - np.pi
         nlog_likelihood += np.sum(np.square(deltaa))
     return nlog_likelihood
@@ -516,8 +519,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
              return_initp=False, jax_minimizer=False, phase_reg_initp=False):
     """Do relative step of redundant calibration
 
-    Initial parameter guesses, if not specified, are 1+1j for both the gains
-    and the true sky visibilities.
+    Initial parameter guesses, if not specified, are 1+1j and 0+0j in cartesian
+    coordinates, 1*e^0j and 0*e^0j in polar coordinates for the gains and true
+    sky visibilities
 
     :param credg: Grouped baselines, condensed so that antennas are
     consecutively labelled. See relabelAnts
@@ -565,6 +569,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :type return_initp: bool
     :param jax_minimizer: Use jax minimization implementation - only if unbounded
     :type jax_minimizer: bool
+    :param phase_reg_initp: Add regularization term to constrain the phases to be
+    the same as the ones from the initial parameters
+    :type phase_reg_initp: bool
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -654,6 +661,108 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                   'negative gain amplitudes were found.')
         else:
             res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords=coords)
+    if return_initp:
+        retn = res, initp
+    else:
+        retn = res
+    return retn
+
+
+def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, \
+                      params):
+    """Redundant relative negative log-likelihood calculator
+
+    *DEFAULT IMPLEMENTATION*
+
+    We impose that the true sky visibilities from redundant baseline sets are
+    equal, and use this prior to calibrate the visibilities (up to some degenerate
+    parameters). We set the noise for each visibility to be 1.
+
+    Note: parameter order is such that the function can be usefully partially applied.
+
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
+    :type distribution: str
+    :param obsvis: Observed sky visibilities for a given frequency and given time,
+    reformatted to have format consistent with credg
+    :type obsvis: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param phase_reg_initp: Add regularization term to constrain the phases to be
+    the same as the ones from the initial parameters
+    :type phase_reg_initp: bool
+    :param params: Parameters to constrain - redundant visibilities and gains
+    (Re & Im components interweaved)
+    :type params: ndarray
+
+    :return: Negative log-likelihood of MLE computation
+    :rtype: float
+    """
+    vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
+    vis = makeCArray(vis_comps)
+    gains = makeCArray(gain_comps)
+    delta = obsvis - gVis(vis, credg, gains)
+    nlog_likelihood = NLLFN[distribution](delta)
+    if phase_reg_initp is not None:
+        visr, gainsr = split_rel_results(phase_reg_initp, no_unq_bls, coords='cartesian')
+        deltaa = (np.angle(gainsr) - np.angle(gains) + np.pi) % (2*np.pi) - np.pi
+        nlog_likelihood += np.sum(np.square(deltaa))
+    return nlog_likelihood
+
+
+def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
+              initp=None, return_initp=False):
+    """Do relative step of redundant calibration
+
+    *DEFAULT IMPLEMENTATION*
+
+    Initial parameter guesses, if not specified, are 1+1j and 0+0j for the gains
+    and true sky visibilities.
+
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
+    :param obsvis: Observed sky visibilities for a given frequency and given time,
+    reformatted to have format consistent with redg
+    :type obsvis: ndarray
+    :param no_unq_bls: Number of unique baselines (equivalently the number of
+    redundant visibilities)
+    :type no_unq_bls: int
+    :param no_ants: Number of antennas for given observation
+    :type no_ants: int
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
+    :type distribution: str
+    :param initp: Initial parameter guesses for true visibilities and gains
+    :type initp: ndarray, None
+    :param return_initp: Return optimization parameters that can be reused
+    :type return_initp: bool
+
+    :return: Optimization result for the solved antenna gains and true sky
+    visibilities
+    :rtype: Scipy optimization result object
+    """
+    if initp is None:
+        # set up initial parameters
+        xvis = np.zeros(no_unq_bls*2) # complex vis
+        xgains = np.ones(no_ants*2) # complex gains
+        initp = np.hstack([xvis, xgains])
+        phase_reg_initp = None
+    else:
+        phase_reg_initp = initp
+
+    ff = jit(functools.partial(relative_nlogLklD, credg, distribution, obsvis, \
+                               no_unq_bls, phase_reg_initp))
+
+    res = minimize(ff, initp, bounds=None, method='BFGS', \
+                   jac=jacrev(ff), hess=None, options={'maxiter':2000})
+    print(res['message'])
+    initp = numpy.copy(res['x'])
+    res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords='cartesian')
     if return_initp:
         retn = res, initp
     else:
