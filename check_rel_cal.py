@@ -17,9 +17,9 @@ import pandas as pd
 import numpy
 
 from fit_diagnostics import norm_residuals
-from red_likelihood import doRelCal, group_data, norm_rel_sols, relabelAnts
-from red_utils import find_zen_file, fn_format, get_bad_ants, new_fn, \
+from red_likelihood import doRelCal, group_data, norm_rel_sols, relabelAnts, \
 split_rel_results
+from red_utils import find_zen_file, fn_format, get_bad_ants, new_fn
 
 
 def main():

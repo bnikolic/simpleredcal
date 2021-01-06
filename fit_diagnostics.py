@@ -5,9 +5,8 @@ import numpy
 import pandas as pd
 
 from red_likelihood import degVis, group_data, gVis, makeCArray, makeEArray, \
-red_ant_sep
-from red_utils import find_flag_file, find_zen_file, get_bad_ants, \
-split_rel_results
+red_ant_sep, split_rel_results
+from red_utils import find_flag_file, find_zen_file, get_bad_ants
 
 
 def norm_residuals(x_meas, x_pred):

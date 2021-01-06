@@ -308,30 +308,6 @@ def match_lst(JD_time, JD_day, tint=0):
     return tgt_jd_time
 
 
-def split_rel_results(resx, no_unq_bls, coords='cartesian'):
-    """Split the real results array from relative calibration minimization into
-    complex visibility and gains arrays
-
-    :param resx: Optimization result for the solved antenna gains and true sky
-    visibilities
-    :type resx: ndarray
-    :param no_unq_bls: Number of unique baselines (equivalently the number of
-    redundant visibilities)
-    :type no_unq_bls: int
-    :param coords: Coordinate system in which gain and visibility parameters
-    have been set up
-    :type coords: str {"cartesian", "polar"}
-
-    :return: Tuple of visibility and gain solution arrays
-    :rtype: tuple
-    """
-    cfun = {'cartesian':makeCArray, 'polar':makeEArray}
-    vis_params, gains_params = numpy.split(resx, [no_unq_bls*2,])
-    res_vis = cfun[coords](vis_params)
-    res_gains = cfun[coords](gains_params)
-    return res_vis, res_gains
-
-
 def split_opt_results(optx, no_ants):
     """Split the real results array from optimal absolute calibration minimization
     into complex visibility, degenerate parameter and complex gain arrays

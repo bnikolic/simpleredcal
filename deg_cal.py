@@ -29,9 +29,9 @@ import pandas as pd
 import numpy
 
 from fit_diagnostics import append_residuals_deg
-from red_likelihood import doDegVisVis, red_ant_sep
+from red_likelihood import doDegVisVis, red_ant_sep, split_rel_results
 from red_utils import find_nearest, find_rel_df, find_zen_file, fn_format, \
-lst_to_jd_time, match_lst, mod_str_arg, new_fn, split_rel_results
+lst_to_jd_time, match_lst, mod_str_arg, new_fn
 
 
 def main():
