@@ -197,10 +197,6 @@ def main():
             time_ints2 = numpy.tile(rel_df_c.index.get_level_values('time_int').unique().values, freq_chans.size)
             iter_dims = [idim+(tint,) for idim, tint in zip(iter_dims, time_ints2)]
 
-            phase_reg_initp = True
-        else:
-            phase_reg_initp = False
-
 
         def cal(credg, distribution, no_unq_bls, no_ants, obsvis, initp):
             """Relative redundant calibration with doRelCalD: default implementation
