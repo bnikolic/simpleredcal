@@ -376,7 +376,7 @@ def new_fn(out, jd_time, dt):
     return re.sub(r'\.+', '.', out)
 
 
-def calfits_to_flags(JD_time, cal_type, pol='ee'):
+def calfits_to_flags(JD_time, cal_type, pol='ee', add_bad_ants=None):
     """Returns flags array from calfits file
 
     :param JD_time: Fractional Julian date
@@ -386,14 +386,18 @@ def calfits_to_flags(JD_time, cal_type, pol='ee'):
     :type cal_type: str
     :param pol: Polarization of data
     :type pol: str
+    :param add_bad_ants: Additional bad antennas
+    :type add_bad_ants: None, int, list, ndarray
 
     :return: Flags array
     :rtype: ndarray
     """
 
     zen_fn = find_zen_file(JD_time)
-    bad_ants = get_bad_ants(zen_fn)
     flags_fn = find_flag_file(JD_time, cal_type)
+    bad_ants = get_bad_ants(zen_fn)
+    if add_bad_ants is not None:
+        bad_ants = numpy.sort(numpy.append(bad_ants, numpy.array(add_bad_ants)))
 
     hc = HERACal(flags_fn)
     _, cal_flags, _, _ = hc.read()
