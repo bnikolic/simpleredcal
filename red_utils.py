@@ -12,9 +12,11 @@ import pandas as pd
 from scipy.optimize import minimize_scalar
 
 import pyuvdata
+from hera_cal.io import HERACal, HERAData
+from hera_cal.redcal import get_reds
 from pyuvdata import utils as uvutils
 
-from red_likelihood import makeCArray, makeEArray
+from red_likelihood import fltBad, groupBls, makeCArray, makeEArray
 
 
 def find_zen_file(JD_time):
@@ -372,3 +374,39 @@ def new_fn(out, jd_time, dt):
         dt = datetime.datetime.now()
     out = '{}.{}.{}.{}'.format(bn, jd_time, dt, ext)
     return re.sub(r'\.+', '.', out)
+
+
+def calfits_to_flags(JD_time, cal_type, pol='ee'):
+    """Returns flags array from calfits file
+
+    :param JD_time: Fractional Julian date
+    :type JD_time: float
+    :param cal_type: Calibration process that produced the calfits file {"first",
+    "omni", "abs", "flagged_abs", "smooth_abs"}
+    :type cal_type: str
+    :param pol: Polarization of data
+    :type pol: str
+
+    :return: Flags array
+    :rtype: ndarray
+    """
+
+    zen_fn = find_zen_file(JD_time)
+    bad_ants = get_bad_ants(zen_fn)
+    flags_fn = find_flag_file(JD_time, cal_type)
+
+    hc = HERACal(flags_fn)
+    _, cal_flags, _, _ = hc.read()
+
+    hd = HERAData(zen_fn)
+    reds = get_reds(hd.antpos, pols=[pol])
+    reds = fltBad(reds, bad_ants)
+    redg = groupBls(reds)
+
+    antpairs = redg[:, 1:]
+    cflag = numpy.empty((hd.Nfreqs, hd.Ntimes, redg.shape[0]), dtype=bool)
+    for g in range(redg.shape[0]):
+        cflag[:, :, g] = cal_flags[(int(antpairs[g, 0]), 'J{}'.format(pol)) or \
+                                   (int(antpairs[g, 1]), 'J{}'.format(pol))].transpose()
+
+    return cflag
