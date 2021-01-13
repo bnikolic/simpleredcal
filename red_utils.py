@@ -382,7 +382,7 @@ def calfits_to_flags(JD_time, cal_type, pol='ee', add_bad_ants=None):
     """Returns flags array from calfits file
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float, float
+    :type JD_time: float, str
     :param cal_type: Calibration process that produced the calfits file {"first",
     "omni", "abs", "flagged_abs", "smooth_abs"}
     :type cal_type: str
@@ -416,3 +416,31 @@ def calfits_to_flags(JD_time, cal_type, pol='ee', add_bad_ants=None):
                                    (int(antpairs[g, 1]), 'J{}'.format(pol))].transpose()
 
     return cflag
+
+
+def bad_ants_from_calfits(JD_time, cal_type, pol='ee'):
+    """Returns bad antennas from calfits file
+
+    :param JD_time: Fractional Julian date
+    :type JD_time: float, str
+    :param cal_type: Calibration process that produced the calfits file {"first",
+    "omni", "abs", "flagged_abs", "smooth_abs"}
+    :type cal_type: str
+    :param pol: Polarization of data
+    :type pol: str
+
+    :return: Bad antennas
+    :rtype: ndarray
+    """
+    flags_fn = find_flag_file(JD_time, cal_type)
+
+    hc = HERACal(flags_fn)
+    _, flags, _, _ = hc.read()
+
+    bad_ants = []
+    for k, v in flags.items():
+        if k[1] == 'J{}'.format(pol):
+            check = v.all()
+            if check:
+                bad_ants.append(k[0])
+    return numpy.asarray(bad_ants)
