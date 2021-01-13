@@ -6,7 +6,8 @@ average phase of antenna gains is set to 0, the overall phase if set to 0 and
 the phase gradients are 0.
 
 example run:
-$ python opt_cal.py 2458098.43869 --pol ee --chans 300~301 --tints 10~11
+$ python opt_cal.py '2458098.43869' --pol 'ee' --chans 300~301 --tints 10~11 \
+--dist 'gaussian'
 
 Can then read the results dataframe with:
 > pd.read_pickle('opt_df.2458098.43869.ee.cauchy.pkl')
@@ -49,7 +50,7 @@ def main():
     the absolute optimal calibration.
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
-                        analyze', metavar='JD', type=float)
+                        analyze', metavar='JD', type=str)
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
@@ -58,7 +59,7 @@ def main():
                         type=str, help='Frequency channels to fit {0, 1023}')
     parser.add_argument('-t', '--tints', required=False, default=None, metavar='T', \
                         type=str, help='Time integrations to fit {0, 59}')
-    parser.add_argument('-d', '--dist', required=False, default='cauchy', metavar='D', \
+    parser.add_argument('-d', '--dist', required=True, metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-a', '--ref_ant_idx', required=False, default=16, metavar='A', \
@@ -115,8 +116,9 @@ def main():
     if ptints is None:
         ptints = '0~{}'.format(md['Ntimes']-1)
     print('Running absolute optimal calibration for visibility dataset {} '\
-          'for frequency channel(s) {} and time integration(s) {}\n'.\
-          format(os.path.basename(zen_fn), pchans, ptints))
+          'for frequency channel(s) {} and time integration(s) {} '\
+          'with {} assumed noise distribution\n'.\
+          format(os.path.basename(zen_fn), pchans, ptints, args.dist))
 
     if freq_chans is None:
         freq_chans = numpy.arange(md['Nfreqs'])

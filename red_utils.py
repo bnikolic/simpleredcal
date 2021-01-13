@@ -23,7 +23,7 @@ def find_zen_file(JD_time):
     """Returns visibility dataset path for the specified JD_time
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float
+    :type JD_time: float, str
 
     :return: File path of visibility dataset
     :rtype: str
@@ -48,7 +48,7 @@ def find_flag_file(JD_time, cal_type):
     """Returns flag dataset path for the specified JD_time
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float
+    :type JD_time: float, str
     :param cal_type: Calibration process that produced the flag file {"first",
     "omni", "abs", "flagged_abs", "smooth_abs"}, to name a few
     :type cal_type: str
@@ -78,7 +78,7 @@ def find_rel_df(JD_time, pol, dist, dir=None):
     JD time, polarization and fitting distribution
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float
+    :type JD_time: float, str
     :param pol: Polarization of data
     :type pol: str
     :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
@@ -108,7 +108,7 @@ def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
     JD time, polarization, degenerate dimension and fitting distribution
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float
+    :type JD_time: float, str
     :param pol: Polarization of data
     :type pol: str
     :param deg_dim: Dimension to compare relatively calibrated visibility
@@ -128,9 +128,9 @@ def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
     if dir is not None:
         dir_path = dir
     if deg_dim == 'jd':
-        deg_dim = 'jd.{}'.format(int(JD_time) + 1)
+        deg_dim = 'jd.{}'.format(int(float(JD_time)) + 1)
     df_path = '{}/deg_df.{}.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, deg_dim, \
-                                              dist)
+                                                 dist)
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
@@ -146,7 +146,7 @@ def find_opt_df(JD_time, pol, dist, dir=None):
     JD time, polarization and fitting distribution
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float
+    :type JD_time: float, str
     :param pol: Polarization of data
     :type pol: str
     :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
@@ -209,7 +209,7 @@ def flt_ant_coords(jd_time, antcoords):
     antennas
 
     :param JD_time: Fractional Julian date associated with antcoords
-    :type JD_time: float
+    :type JD_time: float, str
     :param antcoords: Antenna coordinates (e.g. position, separation etc.)
     :type antcoords: dict
 
@@ -250,7 +250,7 @@ def jd_to_lst(JD_time, telescope='HERA'):
     """Converts fractional JD of HERAData object into LAST
 
     :param JD: Julian time
-    :type JD: float
+    :type JD: float, str
     :param telescope: Known telescope to pyuvdata
     :type telescope: str
 
@@ -303,6 +303,8 @@ def match_lst(JD_time, JD_day, tint=0):
     :return: Julian time of the target dataset
     :rtype: float
     """
+    if isinstance(JD_time, str):
+        JD_time = float(JD_time)
     df = pd.read_pickle('jd_lst_map_idr2.pkl') # df of JD and LAST information
     lst = df.loc[df['JD_time'] == JD_time]['LASTs'].values[0][tint] # take 1st LAST
     tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
@@ -367,11 +369,11 @@ def new_fn(out, jd_time, dt):
     """
     bn = os.path.splitext(out)[0]
     ext = os.path.splitext(out)[-1]
-    dt = dt.strftime('%Y_%m_%d.%H_%M_%S')
     if jd_time is None:
         jd_time = ''
     if dt is None:
         dt = datetime.datetime.now()
+    dt = dt.strftime('%Y_%m_%d.%H_%M_%S')
     out = '{}.{}.{}.{}'.format(bn, jd_time, dt, ext)
     return re.sub(r'\.+', '.', out)
 
@@ -380,7 +382,7 @@ def calfits_to_flags(JD_time, cal_type, pol='ee', add_bad_ants=None):
     """Returns flags array from calfits file
 
     :param JD_time: Fractional Julian date
-    :type JD_time: float
+    :type JD_time: float, float
     :param cal_type: Calibration process that produced the calfits file {"first",
     "omni", "abs", "flagged_abs", "smooth_abs"}
     :type cal_type: str

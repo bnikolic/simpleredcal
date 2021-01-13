@@ -2,7 +2,7 @@
 across LAST, frequency, or JD
 
 example run:
-$ python deg_cal.py 2458098.43869 --deg_dim 'freq' --pol 'ee' --chans 300~301 --tints 10~11
+$ python deg_cal.py '2458098.43869' --deg_dim 'freq' --pol 'ee' --chans 300~301 --tints 10~11
 
 Can then read the results dataframe with:
 > pd.read_pickle('deg_df.2458098.43869.ee.freq.cauchy.pkl')
@@ -47,7 +47,7 @@ def main():
     the degenerate fitting.
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
-                        analyze', metavar='JD', type=float)
+                        analyze', metavar='JD', type=str)
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
@@ -82,7 +82,7 @@ def main():
         tgt_jd = args.tgt_jd
         if tgt_jd is None:
             # choose consecutive JD as default
-            tgt_jd = int(args.jd_time) + 1
+            tgt_jd = int(float(args.jd_time)) + 1
         pjd = '.' + str(tgt_jd)
 
     out_fn = args.out
@@ -165,10 +165,14 @@ def main():
         indices = ['time_int1', 'time_int2', 'freq']
         # find dataset from specified JD that contains visibilities at the same LAST
         jd_time2 = match_lst(args.jd_time, tgt_jd)
+        if len(str(jd_time2)) < 13:
+            jd_time2 = str(jd_time2) + '0' # add a trailing 0 that is omitted in float
         rel_df_path2 = find_rel_df(jd_time2, args.pol, args.dist, args.rel_dir)
+        if isinstance(jd_time2, str):
+            jd_time2 = float(jd_time2)
         # aligning datasets in LAST
         last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
-        last1 = last_df[last_df['JD_time'] == args.jd_time]['LASTs'].values[0]
+        last1 = last_df[last_df['JD_time'] == float(args.jd_time)]['LASTs'].values[0]
         last2 = last_df[last_df['JD_time'] == jd_time2]['LASTs'].values[0]
         _, offset = find_nearest(last2, last1[0])
 

@@ -2,7 +2,7 @@
 and time
 
 example run:
-$ python rel_cal.py 2458098.43869 --pol 'ee' --chans 300~301 --tints 0~1 \
+$ python rel_cal.py '2458098.43869' --pol 'ee' --chans 300~301 --tints 0~1 \
 --flag_type 'first' --dist 'cauchy'
 
 Can then read the dataframe with:
@@ -49,7 +49,7 @@ def main():
     time integration.
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
-                        calibrate', metavar='JD', type=float)
+                        calibrate', metavar='JD', type=str)
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
@@ -63,7 +63,7 @@ def main():
     parser.add_argument('-f', '--flag_type', required=False, default='first', \
                         metavar='F', type=str, help='Flag type e.g. "first", \
                         "omni", "abs"')
-    parser.add_argument('-d', '--dist', required=True, default='cauchy', metavar='D', \
+    parser.add_argument('-d', '--dist', required=True, metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
     parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
@@ -170,10 +170,14 @@ def main():
 
         if args.initp_jd is not None:
             jd_time2 = match_lst(args.jd_time, args.initp_jd)
+            if len(str(jd_time2)) < 13:
+                jd_time2 = str(jd_time2) + '0' # add a trailing 0 that is omitted in float
             rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist)
+            if isinstance(jd_time2, str):
+                jd_time2 = float(jd_time2)
 
             last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
-            last1 = last_df[last_df['JD_time'] == args.jd_time]['LASTs'].values[0]
+            last1 = last_df[last_df['JD_time'] == float(args.jd_time)]['LASTs'].values[0]
             last2 = last_df[last_df['JD_time'] == jd_time2]['LASTs'].values[0]
             _, offset = find_nearest(last2, last1[0])
 

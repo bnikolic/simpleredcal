@@ -1,7 +1,7 @@
 """Check the relative redundant calibration of solutions
 
 example run:
-$ python check_rel_cal.py rel_df.2458098.43869.ee.cauchy.pkl
+$ python check_rel_cal.py 'rel_df.2458098.43869.ee.cauchy.pkl'
 """
 
 
@@ -62,7 +62,7 @@ def main():
     startTime = datetime.datetime.now()
 
     sout = args.rel_df.split('.')
-    jd_time = float('{}.{}'.format(sout[1], sout[2]))
+    jd_time = str('{}.{}'.format(sout[1], sout[2]))
     pol = sout[3]
     dist = sout[4]
     no_checks = args.no_checks
