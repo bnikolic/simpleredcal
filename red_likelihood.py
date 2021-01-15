@@ -18,11 +18,11 @@ from jax.config import config
 config.update('jax_enable_x64', True)
 import jax
 from jax import jit, jacrev, jacfwd
+from jax import numpy as np
 from jax.scipy.optimize import minimize as jminimize
 
-# n.b. where 'numpy' is used below it has to be real numpy. 'np' can be
-# either jax or real numpy
-np = jax.numpy
+# n.b. where 'numpy' is used below it has to be real numpy. 'np' here is the
+# jax implementation
 
 
 def fltBad(bll, badl, minbl=2):
