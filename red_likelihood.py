@@ -639,12 +639,12 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             lb[-2*no_ants::2] = 0 # lower bound for gain amplitudes
             bounds = Bounds(lb, ub)
             method = 'trust-constr'
-            hess = jacfwd(jacrev(ff))
+            hess = jit(jacfwd(jacrev(ff)))
             jac = None
         else:
             bounds = None
             method = 'BFGS'
-            jac = jacrev(ff)
+            jac = jit(jacrev(ff))
             hess = None
         res = minimize(ff, initp, bounds=bounds, method=method, \
                        jac=jac, hess=hess, options={'maxiter':max_nit})
@@ -766,7 +766,7 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
                                no_unq_bls, phase_reg_initp))
 
     res = minimize(ff, initp, bounds=None, method='BFGS', \
-                   jac=jacrev(ff), hess=None, options={'maxiter':2000})
+                   jac=jit(jacrev(ff)), hess=None, options={'maxiter':2000})
     print(res['message'])
     initp = numpy.copy(res['x'])
     res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords='cartesian')
@@ -1102,11 +1102,11 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
             bounds = Bounds(lb, ub)
             method = 'trust-constr'
             jac = None
-            hess = jacfwd(jacrev(ff))
+            hess = jit(jacfwd(jacrev(ff)))
         else:
             bounds = None
             method = 'BFGS'
-            jac = jacrev(ff)
+            jac = jit(jacrev(ff))
             hess = None
         res = minimize(ff, initp, bounds=bounds, method=method, \
                        jac=jac, hess=hess, options={'maxiter':max_nit})
@@ -1357,7 +1357,7 @@ def doOptCal(credg, obsvis, no_ants, ant_pos_arr, ant_sep, rel_vis, distribution
 
     ff = jit(functools.partial(optimal_nlogLkl, credg, distribution, \
                                ant_sep, obsvis, rel_vis, no_ants, logamp))
-    res = minimize(ff, initp, jac=jacrev(ff), hess=jacfwd(jacrev(ff)), \
+    res = minimize(ff, initp, jac=jit(jacrev(ff)), hess=jit(jacfwd(jacrev(ff))), \
                    constraints=cons, bounds=bounds, method='trust-constr', \
                    options={'maxiter':max_nit})
     print(res['message'])
@@ -1434,6 +1434,6 @@ def doDegVisVis(ant_sep, rel_vis1, rel_vis2, distribution='cauchy', \
 
     ff = jit(functools.partial(deg_nlogLkl, distribution, ant_sep, \
                                rel_vis1, rel_vis2))
-    res = minimize(ff, initp, jac=jacrev(ff), options={'maxiter':max_nit})
+    res = minimize(ff, initp, jac=jit(jacrev(ff)), options={'maxiter':max_nit})
     print(res['message'])
     return res
