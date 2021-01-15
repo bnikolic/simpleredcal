@@ -1186,7 +1186,7 @@ def optimal_nlogLkl(credg, distribution, ant_sep, obsvis, rel_vis, no_ants, \
         o_amp, deg_rest = np.split(deg_params, [1,])
         deg_params = np.hstack([np.exp(o_amp), deg_rest])
     rel_gains = makeEArray(rel_gain_comps)
-    w_alpha = degVis(ant_sep, rel_vis, *deg_params[[0, 2, 3]])
+    w_alpha = degVis(ant_sep, rel_vis, *deg_params[np.array([0, 2, 3])])
     delta = obsvis - gVis(w_alpha, credg, rel_gains)
     nlog_likelihood = NLLFN[distribution](delta)
     return nlog_likelihood
