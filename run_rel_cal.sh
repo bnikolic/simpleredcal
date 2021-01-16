@@ -14,5 +14,5 @@
 #PBS -j oe
 #PBS -o rel_cal.2458098.43869.ee.gaussian.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py '2458098.43869' --pol 'ee' \
+/users/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py '2458098.43869' --pol 'ee' \
 --flag_type 'first' --dist 'gaussian' --initp_jd 2458099

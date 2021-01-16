@@ -14,5 +14,5 @@
 #PBS -j oe
 #PBS -o deg_cal.2458098.43869.ee.jd.2458099.gaussian.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python deg_cal.py '2458098.43869' --deg_dim 'jd' \
+/users/mmolnar/anaconda3/envs/hera/bin/python deg_cal.py '2458098.43869' --deg_dim 'jd' \
 --pol 'ee' --dist 'gaussian' --coords 'cartesian'

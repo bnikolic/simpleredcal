@@ -14,5 +14,5 @@
 #PBS -j oe
 #PBS -o opt_cal.2458098.43869.ee.gaussian.out
 
-/lustre/aoc/projects/hera/mmolnar/anaconda3/envs/hera/bin/python opt_cal.py '2458098.43869' --pol 'ee' \
+/users/mmolnar/anaconda3/envs/hera/bin/python opt_cal.py '2458098.43869' --pol 'ee' \
 --dist 'gaussian'
