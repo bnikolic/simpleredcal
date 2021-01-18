@@ -247,6 +247,7 @@ def main():
             if cData.shape[0] != freqs.size or cData.shape[1] != tints.size:
                 _, _, cData = group_data(zen_fn, args.pol, freqs, tints, \
                                          bad_ants, flag_path=flag_fn)
+                cData = cData.data
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
         df = append_residuals_rel(df, cData, cRedG, 'cartesian', out_fn=None)
