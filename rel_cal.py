@@ -68,6 +68,9 @@ def main():
                         {"cauchy", "gaussian"}')
     parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
                         type=int, help='JD of to find datasets to reuse initial parameters')
+    parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
+                        type=str, help='Directory in which relative calibration \
+                        results dataframes are located, if solutions are reused as initial parameters')
     parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
                         type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
@@ -180,7 +183,7 @@ def main():
             jd_time2 = match_lst(args.jd_time, args.initp_jd)
             if len(str(jd_time2)) < 13:
                 jd_time2 = str(jd_time2) + '0' # add a trailing 0 that is omitted in float
-            rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist)
+            rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist, dir=rel_dir)
             if isinstance(jd_time2, str):
                 jd_time2 = float(jd_time2)
 
@@ -194,7 +197,7 @@ def main():
 
             next_row = numpy.where(last_df['JD_time'] == jd_time2)[0][0] + 1
             rel_df_path2 = find_rel_df(last_df.iloc[next_row]['JD_time'], args.pol, \
-                                       args.dist)
+                                       args.dist, dir=rel_dir)
             rel_df2 = pd.read_pickle(rel_df_path2)
             rel_df2 = rel_df2[rel_df2.index.get_level_values('time_int') < offset]
 
