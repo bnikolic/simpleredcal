@@ -15,4 +15,4 @@
 #PBS -o opt_cal.2458098.43869.ee.gaussian.out
 
 /users/mmolnar/anaconda3/envs/hera/bin/python opt_cal.py '2458098.43869' --pol 'ee' \
---dist 'gaussian'
+--dist 'gaussian' --rel_dir 'rel_dfs' --out_dir 'opt_dfs'

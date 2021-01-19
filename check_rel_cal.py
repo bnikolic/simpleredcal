@@ -55,6 +55,10 @@ def main():
                         to match')
     parser.add_argument('-w', '--overwrite', required=False, action='store_true', \
                         help='Overwrite existing check csv and dataframe')
+    parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
+                        type=str, help='Directory in which rel_dfs are stored')
+    parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
+                        type=str, help='Out directory to store dataframe')
     parser.add_argument('-k', '--keep_csv', required=False, action='store_true', \
                         help='Keep csv file')
     args = parser.parse_args()
@@ -70,6 +74,10 @@ def main():
     out_fn = args.out
     if out_fn is None:
         out_fn = 'check_rel_df.{}.{}.{}'.format(jd_time, pol, dist)
+    if args.out_dir is not None:
+        if not os.path.exists(args.out_dir):
+            os.mkdir(args.out_dir)
+        out_fn = os.path.join(args.out_dir, out_fn)
 
     out_csv = fn_format(out_fn, 'csv')
     csv_exists = os.path.exists(out_csv)
@@ -91,8 +99,11 @@ def main():
 
         print('Checking the relative redundant calibration results for {}\n'.\
               format(args.rel_df))
-
-        rel_df = pd.read_pickle(args.rel_df)
+        if args.rel_dir is not None:
+            rel_dir_path = os.path.join(args.rel_dir, args.rel_df)
+        else:
+            rel_dir_path = args.rel_df
+        rel_df = pd.read_pickle(rel_dir_path)
         no_checks = min(no_checks, len(rel_df.index))
         rnd_idxs = numpy.random.choice(rel_df.index.values, no_checks, \
                                        replace=False)

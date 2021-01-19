@@ -71,6 +71,8 @@ def main():
     parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
                         type=str, help='Directory in which relative calibration \
                         results dataframes are located')
+    parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
+                        type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new csv file')
     args = parser.parse_args()
@@ -89,6 +91,10 @@ def main():
     if out_fn is None:
         out_fn = 'deg_df.{}.{}.{}{}.{}'.format(args.jd_time, args.pol, \
                                                args.deg_dim, pjd, args.dist)
+    if args.out_dir is not None:
+        if not os.path.exists(args.out_dir):
+            os.mkdir(args.out_dir)
+        out_fn = os.path.join(args.out_dir, out_fn)
 
     out_csv = fn_format(out_fn, 'csv')
     out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
@@ -109,6 +115,8 @@ def main():
 
     # retrieving visibility metadata
     md_fn = 'rel_df.{}.{}.md.pkl'.format(args.jd_time, args.pol)
+    if args.rel_dir is not None:
+        md_fn = os.path.join(args.rel_dir, md_fn)
     with open(md_fn, 'rb') as f:
         md = pickle.load(f)
     ant_pos = md['antpos']

@@ -68,6 +68,8 @@ def main():
                         {"cauchy", "gaussian"}')
     parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
                         type=int, help='JD of to find datasets to reuse initial parameters')
+    parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
+                        type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new dataframe')
     args = parser.parse_args()
@@ -78,6 +80,12 @@ def main():
     default_fn = 'rel_df.{}.{}.{}'.format(args.jd_time, args.pol, args.dist)
     if out_fn is None:
         out_fn = default_fn
+    if args.out_dir is not None:
+        if not os.path.exists(args.out_dir):
+            os.mkdir(args.out_dir)
+        out_fn = os.path.join(args.out_dir, out_fn)
+        if out_fn is not None:
+            default_fn = os.path.join(args.out_dir, default_fn)
 
     out_csv = fn_format(out_fn, 'csv')
     out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
