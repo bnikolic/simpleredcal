@@ -204,7 +204,7 @@ def get_bad_ants(zen_path):
     return bad_ants_dict[jd_day]
 
 
-def flt_ant_coords(jd_time, antcoords):
+def flt_ant_coords(jd_time, antcoords, add_bad_ants=None):
     """Sort antenna coordinates according to antenna number and filter out bad
     antennas
 
@@ -212,11 +212,15 @@ def flt_ant_coords(jd_time, antcoords):
     :type JD_time: float, str
     :param antcoords: Antenna coordinates (e.g. position, separation etc.)
     :type antcoords: dict
+    :param add_bad_ants: Additional bad antennas
+    :type add_bad_ants: None, int, list, ndarray
 
     :return: Sorted and filtered antenna coordinates
     :rtype: dict
     """
     bad_ants = get_bad_ants(find_zen_file(jd_time))
+    if add_bad_ants is not None:
+        bad_ants = numpy.sort(numpy.append(bad_ants, numpy.array(add_bad_ants)))
     antcoords = {ant_no: coord for ant_no, coord in sorted(antcoords.items(), \
                 key=lambda item: item[0]) if ant_no not in bad_ants}
     return antcoords
