@@ -411,7 +411,7 @@ def antpos_map(values, flt_ant_pos, title=None, std_rng=2, center=None, \
 
 
 def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
-                 bin_width=None, hist_start=0, ylim=None, figsize=(8, 5)):
+                 bin_width=None, hist_start=0, ylim=None, logy=False, figsize=(8, 5)):
     """Histogram for flagged and unflagged data on the same plot, with option
     for first and last bins to include outliers
 
@@ -431,6 +431,8 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     :type hist_start: int, float
     :param ylim: Set the bottom and top ylimits
     :type ylim: int, float, None
+    :param logy: Bool to make y-axis scale logarithmic
+    :type logy: bool
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -439,28 +441,34 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     if upper_cut is not None:
         hist_end = upper_cut
     else:
-        hist_end = numpy.nanpercentile(values, 97)
-    rnd_base = 10**-numpy.floor(numpy.log10(hist_end))
-    hist_end = numpy.ceil(hist_end*rnd_base)/rnd_base
+        hist_end = numpy.nanpercentile(values, 95)
+        rnd_base = 10**-numpy.floor(numpy.log10(hist_end))
+        hist_end = numpy.ceil(hist_end*rnd_base)/rnd_base
 
     if bin_width is None:
         bin_width = (hist_end - hist_start) / 50
 
+    if lower_cut is not None:
+        hist_start = lower_cut
+
+    bin_range = numpy.arange(hist_start, hist_end+2*bin_width, bin_width)
+    # precision errors adding an extra bin if bin_width is small
+    if int((hist_end - hist_start)/bin_width) + 2 < bin_range.size:
+        bin_range = bin_range[:-1]
+
     _, _, patchesu = plt.hist(values[~flags], range=(hist_start, hist_end+bin_width), \
-                              bins=numpy.arange(hist_start, hist_end+2*bin_width, bin_width), \
-                              density=False, alpha=0.65, label='Unflagged')
-    _, _, patchesf = plt.hist(values[flags], range=(hist_start, 0.0082), \
-                              bins=numpy.arange(hist_start, hist_end+2*bin_width, bin_width), \
-                              density=False, alpha=0.65, label='Flagged')
+                              bins=bin_range, density=False, alpha=0.65, label='Unflagged')
+    _, _, patchesf = plt.hist(values[flags],  range=(hist_start, hist_end+bin_width), \
+                              bins=bin_range, density=False, alpha=0.65, label='Flagged')
 
     if lower_cut is not None:
-        n_lower_outliers = (values[~flags] < lower_cut).sum()
-        patchesu[0].set_height(patches[0].get_height() + n_lower_outliers)
+        n_lower_outliersu = (values[~flags] < lower_cut).sum()
+        patchesu[0].set_height(patchesu[0].get_height() + n_lower_outliersu)
         patchesu[0].set_facecolor('m')
         patchesu[0].set_label('Unflagged lower outliers')
 
-        n_upper_outliersf = (values[flags] < lower_cut).sum()
-        patchesf[0].set_height(patchesf[-1].get_height() + n_upper_outliersf)
+        n_lower_outliersf = (values[flags] < lower_cut).sum()
+        patchesf[0].set_height(patchesf[0].get_height() + n_lower_outliersf)
         patchesf[0].set_facecolor('g')
         patchesf[0].set_label('Flagged lower outliers')
 
@@ -475,10 +483,12 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
         patchesf[-1].set_facecolor('g')
         patchesf[-1].set_label('Flagged upper outliers')
 
-    plt.legend()
     if xlabel is not None:
         plt.xlabel(xlabel)
     if ylim is not None:
         plt.ylim(ylim)
+    if logy:
+        ax.set_yscale('log')
+    plt.legend(loc='best', framealpha=0.5)
     plt.tight_layout()
     plt.show()
