@@ -244,7 +244,12 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
         # vmax = numpy.ceil(numpy.nanpercentile(df[col].values, clip_pctile)*100)/100
         # vmin = numpy.floor(numpy.nanpercentile(df[col].values, clip_pctile_b)*100)/100
 
-    ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center)
+    formatter = ticker.ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-2 ,2))
+
+    ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center, \
+                     cbar_kws={"format": formatter})
     # all_x = numpy.unique(df.reset_index()[columns].values)
     # xticks = numpy.arange(numpy.min(all_x), numpy.max(all_x), 50)
     # ax.set_xticks(xticks)
@@ -490,5 +495,6 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     if logy:
         ax.set_yscale('log')
     plt.legend(loc='best', framealpha=0.5)
+    plt.ticklabel_format(axis="x", style="sci", scilimits=(-2, 2))
     plt.tight_layout()
     plt.show()
