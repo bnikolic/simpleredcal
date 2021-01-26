@@ -197,7 +197,8 @@ def main():
         # with rel_df:
         rel_df_c = pd.concat([rel_df2, rel_df3])
         # pairing time_ints from rel_df and rel_df_c that match in LAST
-        time_ints2 = rel_df_c.index.get_level_values('time_int').unique().values
+        # time_ints2 = rel_df_c.index.get_level_values('time_int').unique().values
+        time_ints2 = numpy.arange(offset, offset + md['Ntimes']) % md['Ntimes']
         iter_dims = [idim for idim in zip(time_ints, time_ints2[time_ints])]
         iter_dims = [idim+(freq_chan,) for idim in iter_dims for freq_chan in \
                      freq_chans]
