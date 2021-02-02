@@ -263,8 +263,8 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
 
 
 def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
-                    xbase=50, ybase=5, center=None, cmap=sns.cm.rocket_r, \
-                    figsize=(14,7)):
+                    xbase=50, ybase=5, vmin=None, center=None, cmap=sns.cm.rocket_r, \
+                    sci_format=False, clip_rnd=100, retn_vlims=False, figsize=(14,7)):
     """Plots heatmap of visibility-related data, with vmax set as a percentile
     of the dataframe
 
@@ -281,10 +281,18 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     :type xbase: int
     :param ybase: x axis limits and tickets are multiples of this value
     :type ybase: int
+    :param vmin: Minimum value of heatmap
+    :type vmin: float
     :param center: Value at which to center the colourmap
     :type center: float
     :param cmap: Colour mapping from data values to colour space
     :type cmap: str, matplotlib colormap name or object, list
+    :param sci_format: Use scientific notation in heatmap colorbar
+    :type sci_format: bool
+    :param clip_rnd: Round to nearest for clipping
+    :param clip_rnd: int, float
+    :param retn_vlims: Return vmin and vmax too
+    :type retn_vlims: bool
     :param figsize: Figure size of plot
     :type figsize: tuple
 
@@ -294,25 +302,36 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     """
 
     # clip on both the bottom and top ends of the array
-    vmin = None
-    if (arr < 0).any():
+    if vmin is None and (arr < 0).any():
         clip_pctile_b = (100 - clip_pctile)/2
         clip_pctile = clip_pctile - clip_pctile_b
-        vmin = numpy.floor(numpy.nanpercentile(arr, clip_pctile_b)*100)/100
+        vmin = numpy.floor(numpy.nanpercentile(arr, clip_pctile_b)*clip_rnd)/clip_rnd
         cmap = 'bwr' # divergent colouring
         center = 0
 
-    vmax = numpy.ceil(numpy.nanpercentile(arr, clip_pctile)*100)/100
+    vmax = numpy.ceil(numpy.nanpercentile(arr, clip_pctile)*clip_rnd)/clip_rnd
+
+    if sci_format:
+        formatter = ticker.ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True)
+        formatter.set_powerlimits((-2 ,2))
+    else:
+        formatter = None
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=center)
+    ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=center, \
+                     cbar_kws={"format": formatter})
     ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
     ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    return fig, ax
+
+    retn = (fig, ax)
+    if retn_vlims:
+        retn += (vmin, vmax)
+    return retn
 
 
 def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None, \
