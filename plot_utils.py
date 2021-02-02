@@ -408,7 +408,7 @@ def antpos_map(values, flt_ant_pos, title=None, std_rng=2, center=None, \
                 color=colour)
     ax.set_xlabel("East-West [m]")
     ax.set_ylabel("North-South [m]")
-    ax.set_title(title);
+    ax.set_title(title)
     ax.axis('equal')
     fig.colorbar(im, ax=ax)
     plt.tight_layout()
