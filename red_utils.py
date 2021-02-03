@@ -73,16 +73,16 @@ def find_flag_file(JD_time, cal_type):
     return flg_path
 
 
-def find_rel_df(JD_time, pol, dist, dir=None):
+def find_rel_df(JD_time, pol, ndist, dir=None):
     """Returns relative calibration results dataframe path for the specified
-    JD time, polarization and fitting distribution
+    JD time, polarization and noise distribution
 
     :param JD_time: Fractional Julian date
     :type JD_time: float, str
     :param pol: Polarization of data
     :type pol: str
-    :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
-    :type dist: str
+    :param ndist: Noise distribution for calibration {"cauchy", "gaussian"}
+    :type ndist: str
     :param dir: Directory in which dataframes are located
     :type dir: str
 
@@ -92,7 +92,7 @@ def find_rel_df(JD_time, pol, dist, dir=None):
     dir_path = '.'
     if dir is not None:
         dir_path = dir
-    df_path = '{}/rel_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, dist)
+    df_path = '{}/rel_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, ndist)
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
@@ -103,9 +103,9 @@ def find_rel_df(JD_time, pol, dist, dir=None):
     return df_path
 
 
-def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
+def find_deg_df(JD_time, pol, deg_dim, ndist, dir=None):
     """Returns degenerate fitting results dataframe path for the specified
-    JD time, polarization, degenerate dimension and fitting distribution
+    JD time, polarization, degenerate dimension and noise distribution
 
     :param JD_time: Fractional Julian date
     :type JD_time: float, str
@@ -116,8 +116,8 @@ def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
     dataset being compared, otherwise the next JD day will be assumed - e.g.
     jd.2458099
     :type deg_dim: str
-    :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
-    :type dist: str
+    :param ndist: Noise distribution for calibration {"cauchy", "gaussian"}
+    :type ndist: str
     :param dir: Directory in which dataframes are located
     :type dir: str
 
@@ -130,7 +130,7 @@ def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
     if deg_dim == 'jd':
         deg_dim = 'jd.{}'.format(int(float(JD_time)) + 1)
     df_path = '{}/deg_df.{}.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, deg_dim, \
-                                                 dist)
+                                                 ndist)
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
@@ -141,16 +141,16 @@ def find_deg_df(JD_time, pol, deg_dim, dist, dir=None):
     return df_path
 
 
-def find_opt_df(JD_time, pol, dist, dir=None):
+def find_opt_df(JD_time, pol, ndist, dir=None):
     """Returns optimal calibration results dataframe path for the specified
-    JD time, polarization and fitting distribution
+    JD time, polarization and noise distribution
 
     :param JD_time: Fractional Julian date
     :type JD_time: float, str
     :param pol: Polarization of data
     :type pol: str
-    :param dist: Fitting distribution for calibration {"cauchy", "gaussian"}
-    :type dist: str
+    :param ndist: Noise distribution for calibration {"cauchy", "gaussian"}
+    :type ndist: str
     :param dir: Directory in which dataframes are located
     :type dir: str
 
@@ -160,7 +160,7 @@ def find_opt_df(JD_time, pol, dist, dir=None):
     dir_path = '.'
     if dir is not None:
         dir_path = dir
-    df_path = '{}/opt_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, dist)
+    df_path = '{}/opt_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, ndist)
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
