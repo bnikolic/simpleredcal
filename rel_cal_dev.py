@@ -80,6 +80,8 @@ def main():
                         help='Add regularization term to constrain the gain phase mean')
     parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
                         type=int, help='JD of to find datasets to reuse initial parameters')
+    parser.add_argument('-v', '--noise', required=False, action='store_true', \
+                        help='Use noise from autos in nlogL calculations')
     parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
                         type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
@@ -164,8 +166,15 @@ def main():
             skip_cal = True
 
     if not skip_cal:
-        _, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
-                                     bad_ants, flag_path=flag_fn)
+        grp = group_data(zen_fn, args.pol, freq_chans, time_ints, \
+                         bad_ants, flag_path=flag_fn, noise=args.noise)
+        if not args.noise:
+            _, RedG, cData = grp
+            noisec = None
+        else:
+            _, RedG, cData, cNData = grp
+
+
         flags = cData.mask
         cData = cData.data
 
@@ -231,7 +240,7 @@ def main():
 
 
         def cal(credg, distribution, coords, no_unq_bls, no_ants, logamp, \
-                tilt_reg, gphase_reg, ant_pos_arr, obsvis, initp):
+                tilt_reg, gphase_reg, ant_pos_arr, obsvis, noise, initp):
             """Relative redundant calibration with doRelCal: unconstrained
             minimizer using cartesian coordinates - this is the fastest solver
 
@@ -261,6 +270,8 @@ def main():
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
+            :param noise: Noise array to feed into log-likelihood calculations
+            :type noise: ndarray
             :param initp: Initial parameter guesses for true visibilities and gains
             :type initp: ndarray, None
 
@@ -269,10 +280,10 @@ def main():
             :rtype: Scipy optimization result object
             """
             res_rel, initp_new = doRelCal(credg, obsvis, no_unq_bls, no_ants, \
-                coords=coords, distribution=distribution, norm_gains=True, \
-                logamp=logamp, tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
-                ant_pos_arr=ant_pos_arr, initp=initp, return_initp=True, \
-                phase_reg_initp=phase_reg_initp)
+                coords=coords, distribution=distribution, noise=noise, \
+                norm_gains=True, logamp=logamp, tilt_reg=tilt_reg, \
+                gphase_reg=gphase_reg, ant_pos_arr=ant_pos_arr, initp=initp, \
+                return_initp=True, phase_reg_initp=phase_reg_initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -280,7 +291,7 @@ def main():
             return res_rel, initp
 
         def cal_RP(credg, distribution, no_unq_bls, no_ants, logamp, \
-                   tilt_reg, gphase_reg, ant_pos_arr, obsvis, initp):
+                   tilt_reg, gphase_reg, ant_pos_arr, obsvis, noise, initp):
             """Relative redundant calibration with doRelCalRP: constrained
             minimizer (by reducing the number of parameters) using polar
             coordinates
@@ -308,6 +319,8 @@ def main():
             :param obsvis: Observed sky visibilities for a given frequency and given time,
             reformatted to have format consistent with redg
             :type obsvis: ndarray
+            :param noise: Noise array to feed into log-likelihood calculations
+            :type noise: ndarray
             :param initp: Initial parameter guesses for true visibilities and gains
             :type initp: ndarray, None
 
@@ -316,9 +329,9 @@ def main():
             :rtype: Scipy optimization result object
             """
             res_rel, initp_ = doRelCalRP(credg, obsvis, no_unq_bls, no_ants, \
-                distribution=distribution, constr_phase=True, amp_constr='prod', \
-                bounded=True, logamp=logamp, tilt_reg=tilt_reg, gphase_reg=gphase_reg, \
-                ant_pos_arr=gphase_reg, initp=initp)
+                distribution=distribution, noise=noise, constr_phase=True, \
+                amp_constr='prod', bounded=True, logamp=logamp, tilt_reg=tilt_reg, \
+                gphase_reg=gphase_reg, ant_pos_arr=gphase_reg, initp=initp)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -347,7 +360,9 @@ def main():
                     if args.initp_jd is not None:
                         initp = rel_df_c.loc[(freq_chans[iter_dim[0]], iter_dim[2])]\
                                 [len(slct_keys[:-1]):-2].values.astype(float)
-                    res_rel, initp = RelCal(cData[iter_dim[:2]], initp)
+                    if args.noise:
+                        noisec = cNData[iter_dim[:2]]
+                    res_rel, initp = RelCal(cData[iter_dim[:2]], noisec, initp)
                     # expanding out the solution
                     for j, param in enumerate(res_rel['x']):
                         res_rel[j] = param

@@ -3,6 +3,7 @@
 
 import os
 import functools
+from copy import deepcopy
 
 import numpy
 from matplotlib import pyplot as plt
@@ -12,6 +13,7 @@ from scipy.stats import circmean
 
 import hera_cal
 from hera_cal.io import HERACal, HERAData
+from hera_cal.noise import predict_noise_variance_from_autos
 from hera_cal.redcal import get_reds
 
 from jax.config import config
@@ -87,7 +89,7 @@ def relabelAnts(redg):
 
 
 def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
-               flag_path=None):
+               flag_path=None, noise=False):
     """Returns redundant baseline grouping and reformatted dataset, with
     external flags applied, if specified
 
@@ -103,6 +105,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     :type bad_ants: array-like, None
     :param flag_path: Path of calfits flag file, optional
     :type flag_path: str, None
+    :param noise: Also calculate noise from autocorrelations
+    :type nois: bool
 
     :return hd: HERAData class
     :rtype hd: HERAData class
@@ -121,6 +125,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
     data, flags, _ = hd.read(freq_chans=chans, polarizations=[pol])
+    if noise:
+        ndata = deepcopy(data)
     # filter bls by bad antennas
     if bad_ants is not None:
         reds = fltBad(reds, bad_ants)
@@ -172,7 +178,24 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     for chan in range(len(chans)):
         cdata[chan, ...] = numpy.ma.hstack([data[(*bl_row[1:], pol)][:, chan, \
                                            np.newaxis] for bl_row in redg])
-    return hd, redg, cdata
+    if noise:
+        # to get correct channel width
+        if no_chans == 1:
+            dataf, _, _ = hd.read(freq_chans=np.arange(chans, chans+2), \
+                                  polarizations=[pol])
+            df = np.ediff1d(dataf.freqs)[0]
+        else:
+            df = None
+        cndata = numpy.empty((no_chans, no_tints, redg.shape[0]), dtype=float)
+        ndata = {(*bl, pol): predict_noise_variance_from_autos((*bl, pol), \
+                 ndata, df=df) for bl in redg[:, 1:]}
+        ndata = {k: v[tints, :] for k, v in ndata.items()}
+        for chan in range(len(chans)):
+            cndata[chan, ...] = numpy.hstack([ndata[(*bl_row[1:], pol)][:, chan, \
+                                             np.newaxis] for bl_row in redg])
+        return hd, redg, cdata, cndata
+    else:
+        return hd, redg, cdata
 
 
 def redblMap(redg):
@@ -377,11 +400,19 @@ def gVis(vis, credg, gains):
 
 
 # Negative log-likelihood calculation
-NLLFN = {'cauchy':lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
-         'gaussian':lambda delta: np.square(np.abs(delta)).sum(),
-         't':lambda dn: (-np.log(gamma(0.5*(dn[1] + 1))) + 0.5*np.log(np.pi * dn[1]) \
+NLLFN = {'cauchy': lambda delta: np.log(1 + np.square(np.abs(delta))).sum(),
+         'gaussian': lambda delta: np.square(np.abs(delta)).sum(),
+         't': lambda dn: (-np.log(gamma(0.5*(dn[1] + 1))) + 0.5*np.log(np.pi*dn[1]) \
          + np.log(gamma(0.5*dn[1])) + 0.5*(dn[1] + 1)*(np.log(1 + (1/dn[1])*np.\
-         square(np.abs(dn[0]))))).sum()}
+         square(np.abs(dn[0]))))).sum(),
+         'cauchy_noise': lambda delta, noise: (np.log(np.pi*noise) + np.log(1 + \
+         np.square(np.abs(delta)/noise))).sum(),
+         'gaussian_noise': lambda delta, noise: 0.5*(np.log(2*np.pi*noise) + \
+         np.square(np.abs(delta)/noise)).sum(),
+         't_noise': lambda dn, noise: (-np.log(gamma(0.5*(dn[1] + 1))) + 0.5*np.log(np.pi*dn[1]) \
+         + np.log(gamma(0.5*dn[1])) + np.log(noise) + 0.5*(dn[1] + 1)*(np.log(1 + (1/dn[1])*np.\
+         square(np.abs(dn[0])/noise)))).sum()
+         }
 
 makeC = {'cartesian': makeCArray, 'polar': makeEArray}
 
@@ -432,9 +463,27 @@ def split_rel_results(resx, no_unq_bls, coords='cartesian'):
     return res_vis, res_gains
 
 
+def check_ndist(distribution, noise):
+    """Check that the correct log-likelihood function is used
+
+    :param distribution: Distribution assumption of noise under MLE {'gaussian',
+    'cauchy'}
+    :type distribution: str
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
+    """
+    if noise is not None:
+        if '_noise' not in distribution:
+            distribution = distribution + '_noise'
+    else:
+        if '_noise' in distribution:
+            distribution = distribution.replace('_noise', '')
+    return distribution
+
+
 def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
                      lovamp, tilt_reg, gphase_reg, ant_pos_arr, ref_ant_idx, \
-                     phase_reg_initp, params):
+                     phase_reg_initp, noise, params):
     """Redundant relative negative log-likelihood calculator
 
     We impose that the true sky visibilities from redundant baseline sets are
@@ -477,6 +526,8 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     :param phase_reg_initp: Add regularization term to constrain the phases to be
     the same as the ones from the initial parameters
     :type phase_reg_initp: bool
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im [cartesian] or Amp & Phase [polar] components interweaved for both)
     :type params: ndarray
@@ -496,9 +547,18 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
     gains = makeC[coords](gain_comps)
     delta = obsvis - gVis(vis, credg, gains)
     if 't.' in distribution:
-        delta = delta, int(distribution.split('.')[-1])
-        distribution = 't'
-    nlog_likelihood = NLLFN[distribution](delta)
+        nu = distribution.split('.')[-1]
+        if noise is not None:
+            nu = nu.split('_')[0]
+            distribution = 't_noise'
+        else:
+            distribution = 't'
+        nu = int(nu)
+        delta = delta, nu
+    if noise is not None:
+        nlog_likelihood = NLLFN[distribution](delta, noise)
+    else:
+        nlog_likelihood = NLLFN[distribution](delta)
     if tilt_reg or gphase_reg:
         if coords == 'cartesian':
             gphases = np.angle(gains)
@@ -521,9 +581,10 @@ def relative_nlogLkl(credg, distribution, obsvis, no_unq_bls, coords, logamp, \
 
 
 def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distribution='cauchy', \
-             bounded=False, logamp=False, lovamp=False, norm_gains=False, tilt_reg=False, \
-             gphase_reg=False, ant_pos_arr=None, ref_ant_idx=None, initp=None, max_nit=2000, \
-             return_initp=False, jax_minimizer=False, phase_reg_initp=False):
+             noise=None, bounded=False, logamp=False, lovamp=False, norm_gains=False, \
+             tilt_reg=False, gphase_reg=False, ant_pos_arr=None, ref_ant_idx=None, \
+             initp=None, max_nit=2000, return_initp=False, jax_minimizer=False, \
+             phase_reg_initp=False):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j and 0+0j in cartesian
@@ -547,6 +608,8 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :param distribution: Distribution assumption of noise under MLE {'gaussian',
     'cauchy'}
     :type distribution: str
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
     :param bounded: Bounded optimization, where the amplitudes for the visibilities
     and the gains must be > 0. 'trust-constr' method used.
     :type bounded: bool
@@ -624,13 +687,24 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     else:
         phase_reg_initp = None
 
+    distribution = check_ndist(distribution, noise)
     ff = jit(functools.partial(relative_nlogLkl, credg, distribution, obsvis, \
                                no_unq_bls, coords, logamp, lovamp, tilt_reg, gphase_reg, \
-                               ant_pos_arr, ref_ant_idx, phase_reg_initp))
+                               ant_pos_arr, ref_ant_idx, phase_reg_initp, noise))
 
+    if noise is not None:
+        # Since low noise values greatly increase the function being minimized
+        if distribution != 'gaussian_noise':
+            # Convert noise variance to HWHM for cauchy distribution
+            noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
+            tol = 1e-1
+        else:
+            tol = 1e3
+    else:
+        tol = None
     if jax_minimizer and not bounded:
-        res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
-              ._asdict()
+        res = jminimize(ff, initp, method='bfgs', tol=tol, \
+                        options={'maxiter':max_nit})._asdict()
         print('status: {}'.format(res['status']))
     else:
         if bounded and coords == 'polar' and not logamp:
@@ -647,7 +721,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             jac = jit(jacrev(ff))
             hess = None
         res = minimize(ff, initp, bounds=bounds, method=method, \
-                       jac=jac, hess=hess, options={'maxiter':max_nit})
+                       jac=jac, hess=hess, tol=tol, options={'maxiter':max_nit})
     print(res['message'])
     if return_initp:
         # to reuse parameters
@@ -676,7 +750,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
 
 
 def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, \
-                      params):
+                      noise, params):
     """Redundant relative negative log-likelihood calculator
 
     *DEFAULT IMPLEMENTATION*
@@ -702,6 +776,8 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
     :param phase_reg_initp: Add regularization term to constrain the phases to be
     the same as the ones from the initial parameters
     :type phase_reg_initp: bool
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im components interweaved)
     :type params: ndarray
@@ -713,7 +789,10 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
     vis = makeCArray(vis_comps)
     gains = makeCArray(gain_comps)
     delta = obsvis - gVis(vis, credg, gains)
-    nlog_likelihood = NLLFN[distribution](delta)
+    if noise is not None:
+        nlog_likelihood = NLLFN[distribution](delta, noise)
+    else:
+        nlog_likelihood = NLLFN[distribution](delta)
     if phase_reg_initp is not None:
         visr, gainsr = split_rel_results(phase_reg_initp, no_unq_bls, coords='cartesian')
         deltaa = (np.angle(gainsr) - np.angle(gains) + np.pi) % (2*np.pi) - np.pi
@@ -722,7 +801,7 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
 
 
 def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
-              initp=None, return_initp=False):
+              noise=None, initp=None, return_initp=False):
     """Do relative step of redundant calibration
 
     *DEFAULT IMPLEMENTATION*
@@ -744,6 +823,8 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
     :param distribution: Distribution assumption of noise under MLE {'gaussian',
     'cauchy'}
     :type distribution: str
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
     :param return_initp: Return optimization parameters that can be reused
@@ -762,11 +843,22 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
     else:
         phase_reg_initp = initp
 
+    distribution = check_ndist(distribution, noise)
     ff = jit(functools.partial(relative_nlogLklD, credg, distribution, obsvis, \
-                               no_unq_bls, phase_reg_initp))
-
+                               no_unq_bls, phase_reg_initp, noise))
+    if noise is not None:
+        # Increase tol since low noise values greatly increase the fun of minimization
+        if distribution == 'cauchy_noise':
+            # Convert noise variance to HWHM for cauchy distribution
+            noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
+            tol = 1e-1
+        else:
+            tol = 1e3
+    else:
+        tol = None
     res = minimize(ff, initp, bounds=None, method='BFGS', \
-                   jac=jit(jacrev(ff)), hess=None, options={'maxiter':2000})
+                   jac=jit(jacrev(ff)), hess=None, options={'maxiter':2000}, \
+                   tol=tol)
     print(res['message'])
     initp = numpy.copy(res['x'])
     res['x'] = norm_rel_sols(res['x'], no_unq_bls, coords='cartesian')
@@ -917,7 +1009,7 @@ def set_gref(gain_comps, ref_ant_idx, op_ref_ant_idx, constr_phase, amp_constr, 
 
 def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, op_ref_ant_idx, \
                        no_unq_bls, constr_phase, amp_constr, logamp, tilt_reg, gphase_reg, \
-                       ant_pos_arr, params):
+                       ant_pos_arr, noise, params):
     """Redundant relative likelihood calculator
 
     *Polar coordinates with gain constraints*
@@ -961,6 +1053,8 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, op_ref_ant_idx,
     :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
     in ants. See flt_ant_pos. Only required for tilt_reg = True.
     :type ant_pos_arr: ndarray
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
     :param params: Parameters to constrain - redundant visibilities and gains
     (Amp & Phase components interweaved for both)
     :type params: ndarray
@@ -974,7 +1068,10 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, op_ref_ant_idx,
     gains = makeEArray(gain_comps)
     vis = makeEArray(vis_comps)
     delta = obsvis - gVis(vis, credg, gains)
-    nlog_likelihood = NLLFN[distribution](delta)
+    if noise is not None:
+        nlog_likelihood = NLLFN[distribution](delta, noise)
+    else:
+        nlog_likelihood = NLLFN[distribution](delta)
     if tilt_reg or gphase_reg:
         gphases = gain_comps[1::2]
         if tilt_reg:
@@ -989,10 +1086,11 @@ def relative_nlogLklRP(credg, distribution, obsvis, ref_ant_idx, op_ref_ant_idx,
     return nlog_likelihood
 
 
-def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_ant_idx=16, \
-               op_ref_ant_idx=None, constr_phase=False, amp_constr='prod', bounded=False, \
-               logamp=False, tilt_reg=False, gphase_reg=False, ant_pos_arr=None, \
-               initp=None, max_nit=2000, jax_minimizer=False):
+def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', noise=None, \
+               ref_ant_idx=16, op_ref_ant_idx=None, constr_phase=False, \
+               amp_constr='prod', bounded=False, logamp=False, tilt_reg=False, \
+               gphase_reg=False, ant_pos_arr=None, initp=None, max_nit=2000, \
+               jax_minimizer=False):
     """Do relative step of redundant calibration
 
     *Polar coordinates with constraints*
@@ -1022,6 +1120,8 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     :param distribution: Distribution assumption of noise under MLE {'gaussian',
     'cauchy'}
     :type distribution: str
+    :param noise: Noise array to feed into log-likelihood calculations
+    :type noise: ndarray
     :param constr_phase: Constrain the phase of the gains, as well as the amplitudes
     :type constr_phase: bool
     :param amp_constr: Constraint to apply to gain amplitudes: either the
@@ -1086,13 +1186,24 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
     if type(op_ref_ant_idx) == bool and op_ref_ant_idx:
         op_ref_ant_idx = 25 # suitable antenna for H1C_IDR2
 
+    distribution = check_ndist(distribution, noise)
     ff = jit(functools.partial(relative_nlogLklRP, credg, distribution, obsvis, \
-            ref_ant_idx, op_ref_ant_idx, no_unq_bls, constr_phase, amp_constr, \
-            logamp, tilt_reg, gphase_reg, ant_pos_arr))
+             ref_ant_idx, op_ref_ant_idx, no_unq_bls, constr_phase, amp_constr, \
+             logamp, tilt_reg, gphase_reg, ant_pos_arr, noise))
 
+    if noise is not None:
+        # Since low noise values greatly increase the function being minimized
+        if distribution != 'gaussian_noise':
+            # Convert noise variance to HWHM for cauchy distribution
+            noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
+            tol = 1e-1
+        else:
+            tol = 1e3
+    else:
+        tol = None
     if jax_minimizer and not bounded:
-        res = jminimize(ff, initp, method='bfgs', options={'maxiter':max_nit})\
-              ._asdict()
+        res = jminimize(ff, initp, method='bfgs', tol=tol, \
+                        options={'maxiter':max_nit})._asdict()
         print('status: {}'.format(res['status']))
     else:
         if bounded and not logamp:
@@ -1109,7 +1220,7 @@ def doRelCalRP(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy', ref_an
             jac = jit(jacrev(ff))
             hess = None
         res = minimize(ff, initp, bounds=bounds, method=method, \
-                       jac=jac, hess=hess, options={'maxiter':max_nit})
+                       jac=jac, hess=hess, tol=tol, options={'maxiter':max_nit})
     print(res['message'])
     initp = numpy.copy(res['x']) # to reuse parameters
     vis_comps, gain_comps = np.split(res['x'], [no_unq_bls*2, ])
