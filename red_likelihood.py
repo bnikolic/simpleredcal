@@ -116,6 +116,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     with format consistent with redg and dimensions (freq chans,
     time integrations, baselines)
     :rtype cdata: MaskedArray
+    :return cndata: Grouped noise, with same dimensions as cdata
+    :rtype cndata: ndarray
     """
     # format for indexing
     if isinstance(chans, int):
