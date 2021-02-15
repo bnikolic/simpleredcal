@@ -30,8 +30,8 @@ from hera_cal.io import HERAData
 
 from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCalD, group_data, relabelAnts
-from red_utils import find_flag_file, find_nearest, find_rel_df, find_zen_file, \
-fn_format, get_bad_ants, match_lst, mod_str_arg, new_fn
+from red_utils import check_jdt, find_flag_file, find_nearest, find_rel_df, \
+find_zen_file, fn_format, get_bad_ants, match_lst, mod_str_arg, new_fn
 
 
 def main():
@@ -181,8 +181,7 @@ def main():
 
         if args.initp_jd is not None:
             jd_time2 = match_lst(args.jd_time, args.initp_jd)
-            if len(str(jd_time2)) < 13:
-                jd_time2 = str(jd_time2) + '0' # add a trailing 0 that is omitted in float
+            jd_time2 = check_jdt(jd_time2)
             rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist, dir=args.rel_dir)
             if isinstance(jd_time2, str):
                 jd_time2 = float(jd_time2)

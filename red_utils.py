@@ -382,6 +382,20 @@ def new_fn(out, jd_time, dt):
     return re.sub(r'\.+', '.', out)
 
 
+def check_jdt(JD_time):
+    """Check that JD_time has trailing zero so that dataset can be found
+    :param JD_time: JD_time that labels dataset
+    :type JD_time: str, float
+
+    :return: Checked JD_time that correctly labels dataset
+    :rtype: str
+    """
+    if len(str(JD_time)) < 13:
+        # add a trailing 0 that is omitted in float
+        JD_time = str(JD_time) + '0'
+    return JD_time
+
+
 def calfits_to_flags(JD_time, cal_type, pol='ee', add_bad_ants=None):
     """Returns flags array from calfits file
 
