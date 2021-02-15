@@ -13,7 +13,8 @@ config.update('jax_enable_x64', True)
 from jax import numpy as np
 
 from red_likelihood import group_data
-from red_utils import find_flag_file, find_nearest, find_zen_file, match_lst
+from red_utils import check_jdt, find_flag_file, find_nearest, find_zen_file, \
+match_lst
 
 
 def union_bad_ants(JDs):
@@ -110,6 +111,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         else:
             tints_ia = tints_i
 
+        JD_time_ia = check_jdt(JD_time_ia)
         zen_fn_ia = find_zen_file(JD_time_ia)
         flags_fn_ia = find_flag_file(JD_time_ia, use_flags)
         grp_a = group_data(zen_fn_ia, pol, chans=chans, tints=tints_ia, \
@@ -119,6 +121,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         if not single_dataset:
             next_row = numpy.where(last_df['JD_time'] == JD_time_ia)[0][0] + 1
             JD_time_ib = last_df.iloc[next_row]['JD_time']
+            JD_time_ib = check_jdt(JD_time_ib)
             zen_fn_ib = find_zen_file(JD_time_ib)
             flags_fn_ib = find_flag_file(JD_time_ib, use_flags)
             grp_b = group_data(zen_fn_ib, pol, chans=chans, tints=tints_ib, \
