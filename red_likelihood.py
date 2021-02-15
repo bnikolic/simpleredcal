@@ -473,6 +473,9 @@ def check_ndist(distribution, noise):
     :type distribution: str
     :param noise: Noise array to feed into log-likelihood calculations
     :type noise: ndarray
+
+    :return: Corrected noise distribution
+    :rtype: str
     """
     if noise is not None:
         if '_noise' not in distribution:
