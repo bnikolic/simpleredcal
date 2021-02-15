@@ -144,7 +144,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     data = dict(sorted({((j, i, p) if i > j else (i, j, p)): v for \
                         (i, j, p), v in data.items()}.items()))
 
-    no_tints, no_chans = data[list(data.keys())[0]].shape # get data dimensions
+    no_tints = hd.Ntimes
+    no_chans = hd.Nfreqs
     if chans is None:
         chans = np.arange(no_chans) # indices, not channel numbers
     if tints is not None:
@@ -755,7 +756,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
 
 
 def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, \
-                      noise, params):
+                      noise, xd, params):
     """Redundant relative negative log-likelihood calculator
 
     *DEFAULT IMPLEMENTATION*
@@ -783,6 +784,8 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
     :type phase_reg_initp: bool
     :param noise: Noise array to feed into log-likelihood calculations
     :type noise: ndarray
+    :param xd: Across days calibration
+    :type xd: bool
     :param params: Parameters to constrain - redundant visibilities and gains
     (Re & Im components interweaved)
     :type params: ndarray
@@ -793,7 +796,11 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
     vis_comps, gain_comps = np.split(params, [no_unq_bls*2, ])
     vis = makeCArray(vis_comps)
     gains = makeCArray(gain_comps)
-    delta = obsvis - gVis(vis, credg, gains)
+    if xd:
+        delta = obsvis - np.repeat(gVis(vis, credg, gains)[np.newaxis, :], \
+                                   obsvis.shape[0], axis=0)
+    else:
+        delta = obsvis - gVis(vis, credg, gains)
     if noise is not None:
         nlog_likelihood = NLLFN[distribution](delta, noise)
     else:
@@ -806,7 +813,7 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
 
 
 def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
-              noise=None, initp=None, return_initp=False):
+              noise=None, initp=None, xd=False, return_initp=False):
     """Do relative step of redundant calibration
 
     *DEFAULT IMPLEMENTATION*
@@ -832,6 +839,8 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
     :type noise: ndarray
     :param initp: Initial parameter guesses for true visibilities and gains
     :type initp: ndarray, None
+    :param xd: Across days calibration
+    :type xd: bool
     :param return_initp: Return optimization parameters that can be reused
     :type return_initp: bool
 
@@ -849,8 +858,6 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
         phase_reg_initp = initp
 
     distribution = check_ndist(distribution, noise)
-    ff = jit(functools.partial(relative_nlogLklD, credg, distribution, obsvis, \
-                               no_unq_bls, phase_reg_initp, noise))
     if noise is not None:
         # Increase tol since low noise values greatly increase the fun of minimization
         if distribution == 'cauchy_noise':
@@ -861,6 +868,10 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
             tol = 1e3
     else:
         tol = None
+
+    ff = jit(functools.partial(relative_nlogLklD, credg, distribution, obsvis, \
+                               no_unq_bls, phase_reg_initp, noise, xd))
+
     res = minimize(ff, initp, bounds=None, method='BFGS', \
                    jac=jit(jacrev(ff)), hess=None, options={'maxiter':2000}, \
                    tol=tol)
