@@ -174,7 +174,6 @@ def main():
         else:
             _, RedG, cData, cNData = grp
 
-
         flags = cData.mask
         cData = cData.data
 
