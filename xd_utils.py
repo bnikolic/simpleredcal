@@ -119,7 +119,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         cMData_ia = grp_a[2]
 
         if not single_dataset:
-            next_row = numpy.where(last_df['JD_time'] == JD_time_ia)[0][0] + 1
+            next_row = numpy.where(last_df['JD_time'] == float(JD_time_ia))[0][0] + 1
             JD_time_ib = last_df.iloc[next_row]['JD_time']
             JD_time_ib = check_jdt(JD_time_ib)
             zen_fn_ib = find_zen_file(JD_time_ib)
