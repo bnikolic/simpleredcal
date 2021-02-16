@@ -20,7 +20,6 @@ import io
 import os
 import pickle
 import textwrap
-import warnings
 from contextlib import redirect_stdout
 from csv import DictWriter
 
@@ -34,11 +33,6 @@ from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCalD, relabelAnts
 from red_utils import find_zen_file, fn_format, mod_str_arg, new_fn
 from xd_utils import XDgroup_data
-
-warnings.filterwarnings('ignore', \
-    message='telescope_location is not set. Using known values for HERA.')
-warnings.filterwarnings('ignore', \
-    message='antenna_positions is not set. Using known values for HERA.')
 
 
 def main():

@@ -2,6 +2,7 @@
 
 
 import pickle
+import warnings
 
 import numpy
 import pandas as pd
@@ -15,6 +16,11 @@ from jax import numpy as np
 from red_likelihood import group_data
 from red_utils import check_jdt, find_flag_file, find_nearest, find_zen_file, \
 match_lst
+
+warnings.filterwarnings('ignore', \
+    message='telescope_location is not set. Using known values for HERA.')
+warnings.filterwarnings('ignore', \
+    message='antenna_positions is not set. Using known values for HERA.')
 
 
 def union_bad_ants(JDs):
