@@ -755,6 +755,24 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     return retn
 
 
+@jit
+def XDgVis(vis, credg, gains):
+    """Apply gains to visibilities across days
+
+    :param vis: visibilities
+    :type vis: ndarray
+    :param credg: Grouped baselines, condensed so that antennas are
+    consecutively labelled. See relabelAnts
+    :type credg: ndarray
+    :param gains: Antenna gains
+    :type gains: ndarray
+
+    :return: Modified visibilities by applying antenna gains
+    :rtype: ndarray
+    """
+    return vis[:, credg[:, 0]]*gains[:, credg[:, 1]]*np.conj(gains[:, credg[:, 2]])
+
+
 def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, \
                       noise, xd, params):
     """Redundant relative negative log-likelihood calculator
@@ -797,8 +815,9 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
     vis = makeCArray(vis_comps)
     gains = makeCArray(gain_comps)
     if xd:
-        delta = obsvis - np.repeat(gVis(vis, credg, gains)[np.newaxis, :], \
-                                   obsvis.shape[0], axis=0)
+        gains = gains.reshape((obsvis.shape[0], -1))
+        vis = np.tile(vis, obsvis.shape[0]).reshape((obsvis.shape[0], -1))
+        delta = obsvis - XDgVis(vis, credg, gains)
     else:
         delta = obsvis - gVis(vis, credg, gains)
     if noise is not None:
@@ -852,6 +871,8 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
         # set up initial parameters
         xvis = np.zeros(no_unq_bls*2) # complex vis
         xgains = np.ones(no_ants*2) # complex gains
+        if xd:
+            xgains = np.tile(xgains, obsvis.shape[0])
         initp = np.hstack([xvis, xgains])
         phase_reg_initp = None
     else:
