@@ -4,7 +4,7 @@
 import pandas as pd
 import numpy
 
-from red_utils import find_deg_df, find_nearest, find_rel_df, match_lst
+from red_utils import check_jdt, find_deg_df, find_nearest, find_rel_df, match_lst
 
 
 # Note that 2458109 has 1 fewer antennas, as antenna 14 is flagged
@@ -39,14 +39,16 @@ def align_df(df_type, JD_time, JD_comp, dir_path, ndist, pol, JD_anchor=2458099)
     """
     # find dataset from specified JD that contains visibilities at the same LAST
     JD_timea = match_lst(JD_time, JD_comp)
+    JD_timea = check_jdt(JD_timea)
 
     # aligning datasets in LAST
     last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
     last1 = last_df[last_df['JD_time'] == float(JD_time)]['LASTs'].values[0]
     last2 = last_df[last_df['JD_time'] == float(JD_timea)]['LASTs'].values[0]
     _, offset = find_nearest(last2, last1[0])
-    next_row = numpy.where(last_df['JD_time'] == JD_timea)[0][0] + 1
+    next_row = numpy.where(last_df['JD_time'] == float(JD_timea))[0][0] + 1
     JD_timeb = last_df.iloc[next_row]['JD_time']
+    JD_timeb = check_jdt(JD_timeb)
 
     if df_type == 'rel':
         tidx = 'time_int'
