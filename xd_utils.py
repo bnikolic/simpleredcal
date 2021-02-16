@@ -78,7 +78,6 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     if tints is None:
         tints = np.arange(hd.Ntimes)
 
-
     if bad_ants:
         bad_ants = union_bad_ants(JDs)
     else:
@@ -95,6 +94,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
 
     JD_day = int(float(JD_time))
     if JD_day in JDs:
+        JDs = list(JDs)
         JDs.remove(JD_day)
 
     for jd_i in JDs:
