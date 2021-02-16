@@ -35,9 +35,9 @@ from red_likelihood import doRelCalD, relabelAnts
 from red_utils import find_zen_file, fn_format, mod_str_arg, new_fn
 from xd_utils import XDgroup_data
 
-warnings.filterwarnings('ignore', 
+warnings.filterwarnings('ignore', \
     message='telescope_location is not set. Using known values for HERA.')
-warnings.filterwarnings('ignore',
+warnings.filterwarnings('ignore', \
     message='antenna_positions is not set. Using known values for HERA.')
 
 
@@ -181,7 +181,7 @@ def main():
         no_ants = ants.size
         no_unq_bls = numpy.unique(RedG[:, 0]).size
         cRedG = relabelAnts(RedG)
-        psize = (no_ants + no_unq_bls)*2
+        psize = (no_ants*JDs.size + no_unq_bls)*2
 
         # discarding 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
@@ -192,7 +192,7 @@ def main():
             # If all flags are the same
             flags = [flags]
         if True in flags:
-            flg_chans = numpy.where(flags.all(axis=(1,2)))[0] # indices
+            flg_chans = numpy.where(flags.all(axis=(1, 2)))[0] # indices
             print('Flagged channels for visibility dataset {} are: {}\n'.\
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]

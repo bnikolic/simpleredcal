@@ -876,7 +876,11 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
         initp = np.hstack([xvis, xgains])
         phase_reg_initp = None
     else:
-        phase_reg_initp = initp
+        if xd:
+            # Do not care about phase/tilt regularization
+            phase_reg_initp = None
+        else:
+            phase_reg_initp = initp
 
     distribution = check_ndist(distribution, noise)
     if noise is not None:
