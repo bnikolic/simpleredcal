@@ -20,6 +20,7 @@ import io
 import os
 import pickle
 import textwrap
+import warnings
 from contextlib import redirect_stdout
 from csv import DictWriter
 
@@ -33,6 +34,11 @@ from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCalD, relabelAnts
 from red_utils import find_zen_file, fn_format, mod_str_arg, new_fn
 from xd_utils import XDgroup_data
+
+warnings.filterwarnings('ignore', 
+    message='telescope_location is not set. Using known values for HERA.')
+warnings.filterwarnings('ignore',
+    message='antenna_positions is not set. Using known values for HERA.')
 
 
 def main():
@@ -124,7 +130,8 @@ def main():
     print('Running relative redundant calibration on visibility dataset {} for '\
           'polarization {}, JDs {}, frequency channel(s) {} and time integration(s) {} '\
           'with {} assumed noise distribution\n'.\
-          format(os.path.basename(zen_fn), args.pol, JDs, pchans, ptints, args.dist))
+          format(os.path.basename(zen_fn), args.pol, ' '.join(map(str, JDs)), pchans, ptints, \
+                 args.dist))
 
     if freq_chans is None:
         freq_chans = numpy.arange(hd.Nfreqs)
@@ -155,9 +162,11 @@ def main():
             skip_cal = True
 
     if not skip_cal:
-        grp = XDgroup_data(args.jd_time, JDs, args.pol, chans=freq_chans, \
-                           tints=time_ints, use_flags=args.flag_type, \
-                           noise=args.noise)
+        stdout = io.StringIO()
+        with redirect_stdout(stdout): # suppress output
+            grp = XDgroup_data(args.jd_time, JDs, args.pol, chans=freq_chans, \
+                            tints=time_ints, use_flags=args.flag_type, \
+                            noise=args.noise)
         if not args.noise:
             _, RedG, cData = grp
             noisec = None
@@ -204,7 +213,6 @@ def main():
 
         RelCal = functools.partial(cal, cRedG, args.dist, no_unq_bls, no_ants)
 
-        stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
             with open(out_csv, 'a') as f: # write / append to csv file
                 writer = DictWriter(f, fieldnames=header)
@@ -213,8 +221,9 @@ def main():
                 initp = None
                 for i, iter_dim in enumerate(iter_dims):
                     if args.noise:
-                        noisec = cNData[:, iter_dim[:2]]
-                    res_rel, initp = RelCal(cData[:, iter_dim[:2]], noisec, initp)
+                        noisec = cNData[:, iter_dim[0], iter_dim[1], :]
+                    res_rel, initp = RelCal(cData[:, iter_dim[0], iter_dim[1], :], \
+                                            noisec, initp)
                     # expanding out the solution
                     for j, param in enumerate(res_rel['x']):
                         res_rel[j] = param
@@ -232,12 +241,13 @@ def main():
             freqs = df['freq'].unique()
             tints = df['time_int'].unique()
             if cData.shape[0] != freqs.size or cData.shape[1] != tints.size:
-                _, _, cData = group_data(zen_fn, args.pol, freqs, tints, \
-                                         bad_ants, flag_path=flag_fn)
+                _, _, cData = XDgroup_data(args.jd_time, JDs, args.pol, chans=freqs,
+                                           tints=tints, use_flags=args.flag_type, \
+                                           noise=None)
                 cData = cData.data
         df.set_index(indices, inplace=True)
-        # we now append the residuals as additional columns
-        df = append_residuals_rel(df, cData, cRedG, 'cartesian', out_fn=None)
+        # # we now append the residuals as additional columns
+        # df = append_residuals_rel(df, cData, cRedG, 'cartesian', out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
