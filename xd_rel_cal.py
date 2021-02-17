@@ -2,11 +2,11 @@
 and time
 
 example run:
-$ python xd_rel_cal.py '2458098.43869' --jds 2458098~2458116 --pol 'ee' \
+$ python xd_rel_cal.py '2458098.43869' --jds '2458098~2458099' --pol 'ee' \
 --chans 300~301 --tints 0~1 --flag_type 'first' --dist 'cauchy'
 
 Can then read the dataframe with:
-> pd.read_pickle('xd_rel_df.2458098.43869.ee.cauchy.pkl')
+> pd.read_pickle('xd_rel_df.1.3826.ee.cauchy.pkl')
 
 Note that default is to write all solutions to the same csv file, for each
 visibility dataset
@@ -192,9 +192,9 @@ def main():
             # If all flags are the same
             flags = [flags]
         if True in flags:
-            flg_chans = numpy.where(flags.all(axis=(1, 2)))[0] # indices
-            print('Flagged channels for visibility dataset {} are: {}\n'.\
-                 format(os.path.basename(zen_fn), freq_chans[flg_chans]))
+            flg_chans = numpy.where(flags.all(axis=(2, 3)))[0] # indices
+            print('Flagged channels across all days are: {}\n'.\
+                  format(freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
 
         def cal(credg, distribution, no_unq_bls, no_ants, obsvis, noise, initp):
