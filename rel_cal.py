@@ -68,6 +68,8 @@ def main():
                         {"cauchy", "gaussian"}')
     parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
                         type=int, help='JD of to find datasets to reuse initial parameters')
+    parser.add_argument('-v', '--noise', required=False, action='store_true', \
+                        help='Use noise from autos in nlogL calculations')
     parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
                         type=str, help='Directory in which relative calibration \
                         results dataframes are located, if solutions are reused as initial parameters')
@@ -155,8 +157,14 @@ def main():
             skip_cal = True
 
     if not skip_cal:
-        _, RedG, cData = group_data(zen_fn, args.pol, freq_chans, time_ints, \
-                                     bad_ants, flag_path=flag_fn)
+        grp = group_data(zen_fn, args.pol, chans=freq_chans, tints=time_ints, \
+                         bad_ants=bad_ants, flag_path=flag_fn, noise=args.noise)
+        if not args.noise:
+            _, RedG, cData = grp
+            noisec = None
+        else:
+            _, RedG, cData, cNData = grp
+
         flags = cData.mask
         cData = cData.data
 
@@ -212,12 +220,12 @@ def main():
             iter_dims = [idim+(tint,) for idim, tint in zip(iter_dims, time_ints2)]
 
 
-        def cal(credg, distribution, no_unq_bls, no_ants, obsvis, initp):
+        def cal(credg, distribution, no_unq_bls, no_ants, obsvis, noise, initp):
             """Relative redundant calibration with doRelCalD: default implementation
             with unconstrained minimizer using cartesian coordinates
             """
             res_rel, initp_new = doRelCalD(credg, obsvis, no_unq_bls, no_ants, \
-                distribution=distribution, initp=initp, return_initp=True)
+                distribution=distribution, noise=noise, initp=initp, return_initp=True)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -237,7 +245,9 @@ def main():
                     if args.initp_jd is not None:
                         initp = rel_df_c.loc[(freq_chans[iter_dim[0]], iter_dim[2])]\
                                 [len(slct_keys[:-1]):-2].values.astype(float)
-                    res_rel, initp = RelCal(cData[iter_dim[:2]], initp)
+                    if args.noise:
+                        noisec = cNData[iter_dim[:2]]
+                    res_rel, initp = RelCal(cData[iter_dim[:2]], noisec, initp)
                     # expanding out the solution
                     for j, param in enumerate(res_rel['x']):
                         res_rel[j] = param
