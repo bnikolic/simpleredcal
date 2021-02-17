@@ -246,8 +246,8 @@ def main():
                                            noise=None)
                 cData = cData.data
         df.set_index(indices, inplace=True)
-        # # we now append the residuals as additional columns
-        # df = append_residuals_rel(df, cData, cRedG, 'cartesian', out_fn=None)
+        # we now append the residuals as additional columns
+        df = append_residuals_rel(df, cData, cRedG, 'cartesian', out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)

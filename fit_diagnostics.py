@@ -5,7 +5,7 @@ import numpy
 import pandas as pd
 
 from red_likelihood import degVis, group_data, gVis, makeCArray, makeEArray, \
-red_ant_sep, split_rel_results
+red_ant_sep, split_rel_results, XDgVis
 from red_utils import find_flag_file, find_zen_file, get_bad_ants
 
 
@@ -71,6 +71,11 @@ def append_residuals_rel(rel_df, cdata, credg, coords, out_fn=None):
         rel_df.reset_index(inplace=True)
         freqs = rel_df['freq'].unique()
         tints = rel_df['time_int'].unique()
+        if len(cdata.shape) == 4:
+            # then dataset is over JDs
+            xd = True
+        else:
+            xd = False
 
         def calc_rel_residuals(row):
             """Calculate residual and normalized residual to append to relative
@@ -88,8 +93,16 @@ def append_residuals_rel(rel_df, cdata, credg, coords, out_fn=None):
             resx = row.values[cidx:].astype(float)
             res_rel_vis, res_rel_gains = split_rel_results(resx, no_unq_bls, \
                                                            coords)
-            obs_vis = cdata[cmap_f[row['freq']], cmap_t[row['time_int']], :]
-            pred_rel_vis = gVis(res_rel_vis, credg, res_rel_gains)
+            if xd:
+                gvisc = XDgVis
+                res_rel_gains = res_rel_gains.reshape((cdata.shape[0], -1))
+                res_rel_vis = numpy.tile(res_rel_vis, cdata.shape[0]).\
+                                reshape((cdata.shape[0], -1))
+                obs_vis = cdata[:, cmap_f[row['freq']], cmap_t[row['time_int']], :]
+            else:
+                gvisc = gVis
+                obs_vis = cdata[cmap_f[row['freq']], cmap_t[row['time_int']], :]
+            pred_rel_vis = gvisc(res_rel_vis, credg, res_rel_gains)
             rel_residuals = obs_vis - pred_rel_vis
             norm_rel_residuals = norm_residuals(obs_vis, pred_rel_vis)
             return pd.Series([rel_residuals, norm_rel_residuals])
