@@ -6,7 +6,7 @@ $ python align_deg.py 2458098.43869 --jd_comp '2458098~2458099' \
 --jd_anchor 2458099 --pol 'ee' --dist 'gaussian'
 
 Read the resulting dataframe with:
-> pd.read_pickle('aligned_red_deg.ee.gaussian.pkl')
+> pd.read_pickle('aligned_red_deg.1.3826.ee.gaussian.pkl')
 """
 
 import argparse
@@ -21,8 +21,7 @@ import numpy
 
 from align_utils import align_df, idr2_jds, idr2_jdsx
 from red_likelihood import decomposeCArray, degVis, makeCArray, red_ant_sep
-from red_utils import find_deg_df, find_nearest, find_rel_df, fn_format, \
-match_lst, mod_str_arg
+from red_utils import find_deg_df, find_rel_df, fn_format, mod_str_arg
 
 
 def main():
@@ -59,7 +58,10 @@ def main():
 
     out_fn = args.out
     if out_fn is None:
-        out_fn = 'aligned_red_deg.{}.{}'.format(args.pol, args.dist)
+        last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+        last = last_df[last_df['JD_time'] == float(args.jd_time)]['LASTs'].values[0][0]
+        out_fn = 'aligned_red_deg.{}.{}.{}'.format('{:.4f}'.format(last), \
+                                                args.pol, args.dist)
     if args.out_dir is not None:
         if not os.path.exists(args.out_dir):
             os.mkdir(args.out_dir)
@@ -142,12 +144,12 @@ def main():
         if jd_ci in avaiable_jds:
             print('Aligning and adding {} to the resulting dataframe'.format(jd_ci))
             rel_dfk = align_df('rel', args.jd_time, jd_ci, args.rel_dir, args.dist, \
-                            args.pol)
+                               args.pol)
             rel_dfk.drop(columns=resid_cols+gain_list, inplace=True)
 
             if int(jd_ci) != args.jd_anchor:
                 deg_dfk = align_df('deg', args.jd_time, jd_ci, args.deg_dir, args.dist, \
-                                args.pol, JD_anchor=args.jd_anchor)
+                                   args.pol, JD_anchor=args.jd_anchor)
 
                 # Degenerate transformation of redundant visibility solutions
                 deg_dfk = deg_dfk[['0', '1', '2']].copy().reset_index()
