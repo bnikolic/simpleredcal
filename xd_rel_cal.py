@@ -28,7 +28,7 @@ import numpy
 
 from hera_cal.io import HERAData
 
-from align_utils import idr2_jds
+from align_utils import idr2_jds, idr2_jdsx
 from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCalD, relabelAnts
 from red_utils import find_zen_file, fn_format, mod_str_arg, new_fn
@@ -106,11 +106,17 @@ def main():
             csv_exists = False
             pkl_exists = False
 
-    if '_' in args.jds:
-        JDs = numpy.asarray(args.jds.split('_'), dtype=int)
+    JDs = args.jds
+    if JDs == 'idr2_jds':
+        JDs = idr2_jds
+    elif JDs == 'idr2_jdsx':
+        JDs = idr2_jdsx
     else:
-        JDs = mod_str_arg(args.jds)
-    JDs = numpy.intersect1d(JDs, idr2_jds)
+        if '_' in JDs:
+            JDs = numpy.asarray(JDs.split('_'), dtype=int)
+        else:
+            JDs = mod_str_arg(JDs)
+        JDs = numpy.intersect1d(JDs, idr2_jds)
 
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)

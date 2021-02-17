@@ -19,7 +19,7 @@ import textwrap
 import pandas as pd
 import numpy
 
-from align_utils import align_df, idr2_jds
+from align_utils import align_df, idr2_jds, idr2_jdsx
 from red_likelihood import decomposeCArray, degVis, makeCArray, red_ant_sep
 from red_utils import find_deg_df, find_nearest, find_rel_df, fn_format, \
 match_lst, mod_str_arg
@@ -67,11 +67,16 @@ def main():
     out_pkl = fn_format(out_fn, 'pkl')
 
     jd_comp = args.jd_comp
-    if '_' in jd_comp:
-        jd_comp = numpy.asarray(jd_comp.split('_'), dtype=int)
+    if jd_comp == 'idr2_jds':
+        jd_comp = idr2_jds
+    elif jd_comp == 'idr2_jdsx':
+        jd_comp = idr2_jdsx
     else:
-        jd_comp = mod_str_arg(args.jd_comp)
-    jd_comp = numpy.intersect1d(jd_comp, idr2_jds)
+        if '_' in jd_comp:
+            jd_comp = numpy.asarray(jd_comp.split('_'), dtype=int)
+        else:
+            jd_comp = mod_str_arg(args.jd_comp)
+        jd_comp = numpy.intersect1d(jd_comp, idr2_jds)
     jdl_day = int(float(args.jd_time))
     if jdl_day in jd_comp:
         jd_comp = numpy.delete(jd_comp, numpy.where(jd_comp == jdl_day)[0])
