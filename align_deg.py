@@ -68,9 +68,9 @@ def main():
 
     jd_comp = args.jd_comp
     if jd_comp == 'idr2_jds':
-        jd_comp = idr2_jds
+        jd_comp = numpy.asarray(idr2_jds)
     elif jd_comp == 'idr2_jdsx':
-        jd_comp = idr2_jdsx
+        jd_comp = numpy.asarray(idr2_jdsx)
     else:
         if '_' in jd_comp:
             jd_comp = numpy.asarray(jd_comp.split('_'), dtype=int)

@@ -108,9 +108,9 @@ def main():
 
     JDs = args.jds
     if JDs == 'idr2_jds':
-        JDs = idr2_jds
+        JDs = numpy.asarray(idr2_jds)
     elif JDs == 'idr2_jdsx':
-        JDs = idr2_jdsx
+        JDs = numpy.asarray(idr2_jdsx)
     else:
         if '_' in JDs:
             JDs = numpy.asarray(JDs.split('_'), dtype=int)
