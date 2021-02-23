@@ -1,7 +1,9 @@
 """Robust redundant calibration across days"""
 
 
+import os
 import pickle
+import sys
 import warnings
 
 import numpy
@@ -40,8 +42,21 @@ def union_bad_ants(JDs):
     return np.sort(np.unique(bad_ants))
 
 
+def suppressOutput(func):
+    """Utility function that blocks print calls by writing to 
+    the null device"""
+    def func_wrapper(*args, **kwargs):
+        with open(os.devnull, 'w') as devNull:
+            old_stdout = sys.stdout
+            sys.stdout = devNull
+            value = func(*args, **kwargs)
+            sys.stdout = old_stdout
+        return value
+    return func_wrapper
+
+
 def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
-                 use_flags='first', noise=False):
+                 use_flags='first', noise=False, verbose=False):
     """Returns redundant baseline grouping and reformatted dataset, with
     external flags applied, if specified
 
@@ -60,7 +75,9 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     :param use_flags: Use flags to mask data
     :type use_flags: str
     :param noise: Also calculate noise from autocorrelations
-    :type nois: bool
+    :type noise: bool
+    :param verbose: Print data gathering steps for each dataset
+    :type verbose: bool
 
     :return hd: HERAData class
     :rtype hd: HERAData class
@@ -89,7 +106,12 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     else:
         bad_ants = None
 
-    grp = group_data(zen_fn, pol, chans=chans, tints=tints, bad_ants=bad_ants, \
+    if not verbose:
+        grp_data = suppressOutput(group_data)
+    else:
+        grp_data = group_data
+
+    grp = grp_data(zen_fn, pol, chans=chans, tints=tints, bad_ants=bad_ants,
                      flag_path=flags_fn, noise=noise)
     _, redg, cMData = grp[:3]
 
@@ -127,8 +149,8 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         JD_time_ia = check_jdt(JD_time_ia)
         zen_fn_ia = find_zen_file(JD_time_ia)
         flags_fn_ia = find_flag_file(JD_time_ia, use_flags)
-        grp_a = group_data(zen_fn_ia, pol, chans=chans, tints=tints_ia, \
-                           bad_ants=bad_ants, flag_path=flags_fn_ia, noise=noise)
+        grp_a = grp_data(zen_fn_ia, pol, chans=chans, tints=tints_ia, \
+                         bad_ants=bad_ants, flag_path=flags_fn_ia, noise=noise)
         cMData_ia = grp_a[2]
 
         if not single_dataset:
@@ -137,8 +159,8 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
             JD_time_ib = check_jdt(JD_time_ib)
             zen_fn_ib = find_zen_file(JD_time_ib)
             flags_fn_ib = find_flag_file(JD_time_ib, use_flags)
-            grp_b = group_data(zen_fn_ib, pol, chans=chans, tints=tints_ib, \
-                               bad_ants=bad_ants, flag_path=flags_fn_ib, noise=noise)
+            grp_b = grp_data(zen_fn_ib, pol, chans=chans, tints=tints_ib, \
+                             bad_ants=bad_ants, flag_path=flags_fn_ib, noise=noise)
             cMData_ib = grp_b[2]
 
             cMData_i = numpy.ma.concatenate((cMData_ia, cMData_ib), axis=1)
