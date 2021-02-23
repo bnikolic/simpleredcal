@@ -111,11 +111,18 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         last2 = last_df[last_df['JD_time'] == float(JD_time_ia)]['LASTs'].values[0]
         _, offset = find_nearest(last2, last1[0])
         tints_i = (tints + offset)%60
-        single_dataset = all(tints+offset < hd.Ntimes-1)
+        scnd_dataset = all(tints+offset > hd.Ntimes-1)
+        single_dataset = all(tints+offset < hd.Ntimes-1) or scnd_dataset
+
         if not single_dataset:
             tints_ia, tints_ib = np.split(tints_i, np.where(tints_i == 0)[0])
         else:
             tints_ia = tints_i
+
+        if scnd_dataset:
+            next_row = numpy.where(last_df['JD_time'] == float(JD_time_ia))[0][0] + 1
+            JD_time_ib = last_df.iloc[next_row]['JD_time']
+            JD_time_ia = JD_time_ib
 
         JD_time_ia = check_jdt(JD_time_ia)
         zen_fn_ia = find_zen_file(JD_time_ia)
