@@ -200,7 +200,7 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
 
 
 def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
-                     clip_pctile=99, vmin=None, vmax=None, center=None, \
+                     clip_pctile=99, vmin=None, vmax=None, center=None, logv=False, \
                      clip_bottom=False, cmap=sns.cm.rocket_r, figsize=(11,7)):
     """Plot heatmap of results of redundant calibration
 
@@ -223,6 +223,8 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     :type vmax: float
     :param center: Value at which to center the colourmap
     :type center: float
+    :param logv: Logarithm scaling for heatmap values
+    :type logv: bool    
     :param clip_bottom: Clip the bottom values as well as the top ones
     :type clip_bottom: bool
     :param cmap: Colour mapping from data values to colour space
@@ -249,8 +251,14 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     formatter.set_scientific(True)
     formatter.set_powerlimits((-2, 2))
 
-    ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center, \
-                     cbar_kws={"format": formatter})
+    if logv:
+        norm = LogNorm(vmin=vmin, vmax=vmax)
+        ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center, \
+                         cbar_kws={"format": formatter}, norm=norm)
+    else:
+        ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center,
+                         cbar_kws={"format": formatter})
+
     # all_x = numpy.unique(df.reset_index()[columns].values)
     # xticks = numpy.arange(numpy.min(all_x), numpy.max(all_x), 50)
     # ax.set_xticks(xticks)
