@@ -9,6 +9,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib import ticker
+from matplotlib.colors import LogNorm
 
 
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
@@ -246,7 +247,7 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
 
     formatter = ticker.ScalarFormatter(useMathText=True)
     formatter.set_scientific(True)
-    formatter.set_powerlimits((-2 ,2))
+    formatter.set_powerlimits((-2, 2))
 
     ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center, \
                      cbar_kws={"format": formatter})
@@ -363,7 +364,7 @@ def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None,
     :type figsize: tuple
     """
 
-    fig, ax = plt.subplots(figsize=(11, 7))
+    fig, ax = plt.subplots(figsize=figsize)
     ax = sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax)
     if xbase is not None:
         ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
