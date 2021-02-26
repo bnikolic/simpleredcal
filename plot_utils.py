@@ -76,7 +76,7 @@ def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots
     plt.show()
 
 
-ylab_dict = {'nit': 'number of iterations', 'fun': 'log-likelihood'}
+ylab_dict = {'nit': 'number of iterations', 'fun': 'negative log-likelihood'}
 
 
 def clip_ylim(df, col, clip_pctile, pos='top'):
