@@ -224,7 +224,7 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     :param center: Value at which to center the colourmap
     :type center: float
     :param logv: Logarithm scaling for heatmap values
-    :type logv: bool    
+    :type logv: bool
     :param clip_bottom: Clip the bottom values as well as the top ones
     :type clip_bottom: bool
     :param cmap: Colour mapping from data values to colour space
@@ -273,7 +273,8 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
 
 def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
                     xbase=50, ybase=5, vmin=None, center=None, cmap=sns.cm.rocket_r, \
-                    sci_format=False, clip_rnd=100, retn_vlims=False, figsize=(14,7)):
+                    sci_format=False, clip_rnd=100, retn_vlims=False, xoffset=-50,
+                    figsize=(14, 7)):
     """Plots heatmap of visibility-related data, with vmax set as a percentile
     of the dataframe
 
@@ -302,6 +303,8 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     :param clip_rnd: int, float
     :param retn_vlims: Return vmin and vmax too
     :type retn_vlims: bool
+    :param xoffset: offset used for x-axis of heatmap
+    :type xoffset: int
     :param figsize: Figure size of plot
     :type figsize: tuple
 
@@ -331,7 +334,7 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=center, \
                      cbar_kws={"format": formatter})
     ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
-    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=xoffset))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
     ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.set_xlabel(xlabel)
@@ -344,7 +347,8 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
 
 
 def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None, \
-               center=None, vmin=None, vmax=None, cmap=sns.cm.rocket_r, figsize=(11, 7)):
+               center=None, vmin=None, vmax=None, sci_format=True, cmap=sns.cm.rocket_r, \
+               figsize=(11, 7)):
     """Plots heatmap of visibility-related data, with vmax set as a percentile
     of the dataframe
 
@@ -366,6 +370,8 @@ def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None,
     :type vmin: float
     :param vmax: Maximum value of heatmap
     :type vmax: float
+    :param sci_format: Use scientific notation in heatmap colorbar
+    :type sci_format: bool
     :param cmap: Colour mapping from data values to colour space
     :type cmap: str, matplotlib colormap name or object, list
     :param figsize: Figure size of plot
@@ -373,7 +379,16 @@ def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None,
     """
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax = sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax)
+
+    if sci_format:
+        formatter = ticker.ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True)
+        formatter.set_powerlimits((-2 ,2))
+    else:
+        formatter = None
+
+    ax = sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax, \
+                     cbar_kws={"format": formatter})
     if xbase is not None:
         ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
     xoffset = df.columns.values[0]
