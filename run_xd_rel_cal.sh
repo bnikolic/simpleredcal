@@ -15,5 +15,5 @@
 #PBS -o xd_rel_cal.2458098.43869.ee.gaussian.out
 
 /users/mmolnar/anaconda3/envs/hera/bin/python xd_rel_cal.py '2458098.43869' \
---jds '2458098~2458116' --pol 'ee' --flag_type 'first' --dist 'gaussian' \
+--jds 'idr2_jdsx' --pol 'ee' --flag_type 'first' --dist 'gaussian' \
 --out_dir 'xd_rel_dfs'
