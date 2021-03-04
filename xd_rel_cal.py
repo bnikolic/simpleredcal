@@ -81,7 +81,6 @@ def main():
 
     zen_fn = find_zen_file(args.jd_time)
     hd = HERAData(zen_fn)
-    last = hd.lsts[0]
 
     out_fn = args.out
     default_fn = 'xd_rel_df.{}.{}.{}'.format('{:.4f}'.format(hd.lsts[0]), \
@@ -127,11 +126,11 @@ def main():
     ptints = args.tints
     if ptints is None:
         ptints = '0~{}'.format(hd.Ntimes-1)
-    print('Running relative redundant calibration on visibility dataset {} for '\
-          'polarization {}, JDs {}, frequency channel(s) {} and time integration(s) {} '\
-          'with {} assumed noise distribution\n'.\
-          format(os.path.basename(zen_fn), args.pol, ' '.join(map(str, JDs)), pchans, ptints, \
-                 args.dist))
+    print('Running relative redundant calibration across JDs {} between LASTS '\
+          '{:.4f} and {:.4f} for polarization {}, frequency channel(s) {} '\
+          'and time integration(s) {}, with {} assumed noise distribution.\n'.\
+          format(' '.join(map(str, JDs)), hd.lsts[0], hd.lsts[-1], args.pol, \
+                 pchans, ptints, args.dist))
 
     if freq_chans is None:
         freq_chans = numpy.arange(hd.Nfreqs)
@@ -192,7 +191,7 @@ def main():
             # If all flags are the same
             flags = [flags]
         if True in flags:
-            flg_chans = numpy.where(flags.all(axis=(2, 3)))[0] # indices
+            flg_chans = numpy.unique(numpy.where(flags.all(axis=(0, 2, 3)))[0]) # indices
             print('Flagged channels across all days are: {}\n'.\
                   format(freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
