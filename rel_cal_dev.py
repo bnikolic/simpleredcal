@@ -21,6 +21,7 @@ import functools
 import io
 import os
 import pickle
+import sys
 import textwrap
 from contextlib import redirect_stdout
 from csv import DictWriter
@@ -198,6 +199,9 @@ def main():
             print('Flagged channels for visibility dataset {} are: {}\n'.\
                  format(os.path.basename(zen_fn), freq_chans[flg_chans]))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
+            if not iter_dims: # check if slices to solve are empty
+                print('All specified channels are flagged. Exiting.')
+                sys.exit()
 
 
         if args.initp_jd is not None:
