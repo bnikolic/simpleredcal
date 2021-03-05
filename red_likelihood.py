@@ -184,7 +184,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     if noise:
         # to get correct channel width
         if no_chans == 1:
-            dataf, _, _ = hd.read(freq_chans=np.arange(chans, chans+2), \
+            chan = chans[0]
+            dataf, _, _ = hd.read(freq_chans=np.arange(chan, chan+2), \
                                   polarizations=[pol])
             df = np.ediff1d(dataf.freqs)[0]
         else:
