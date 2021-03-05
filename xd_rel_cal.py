@@ -19,6 +19,7 @@ import functools
 import io
 import os
 import pickle
+import sys
 import textwrap
 from contextlib import redirect_stdout
 from csv import DictWriter
@@ -69,6 +70,9 @@ def main():
                         {"cauchy", "gaussian"}')
     parser.add_argument('-v', '--noise', required=False, action='store_true', \
                         help='Use noise from autos in nlogL calculations')
+    parser.add_argument('-cf', '--chan_flag_pct', required=False, default=None, \
+                        metavar='CFP', type=float, help='Flag channel if more than \
+                        X% of day/time slices for a given channel are flagged')
     parser.add_argument('-o', '--out', required=False, default=None, \
                         metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
@@ -191,10 +195,21 @@ def main():
             # If all flags are the same
             flags = [flags]
         if True in flags:
-            flg_chans = numpy.unique(numpy.where(flags.all(axis=(0, 2, 3)))[0]) # indices
-            print('Flagged channels across all days are: {}\n'.\
-                  format(freq_chans[flg_chans]))
+            if args.chan_flag_pct is None:
+                flg_chans = numpy.unique(numpy.where(flags.all(axis=(0, 2, 3)))[0])
+                print('Flagged channels across all days are: {}\n'.\
+                      format(freq_chans[flg_chans]))
+            else:
+                flg_pct = args.chan_flag_pct/100
+                flg_chans = numpy.unique(numpy.where(flags.all(axis=3).mean(axis=(0, 2)) \
+                                                     > flg_pct)[0])
+                print('Flagged channels across all days and those that are '\
+                      'more than {}% flagged for their given day/time slice are: {}\n'.\
+                      format(args.chan_flag_pct, freq_chans[flg_chans] ))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
+            if not iter_dims: # check if slices to solve are empty
+                print('All specified channels are flagged. Exiting.')
+                sys.exit()
 
         def cal(credg, distribution, no_unq_bls, no_ants, obsvis, noise, initp):
             """Relative redundant calibration across days with doRelCalD:
