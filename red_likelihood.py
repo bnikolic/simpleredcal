@@ -704,9 +704,9 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
         if distribution != 'gaussian_noise':
             # Convert noise variance to HWHM for cauchy distribution
             noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
-            tol = 1e-1
+            tol = 5e-1
         else:
-            tol = 1e3
+            tol = 5e3
     else:
         tol = None
     if jax_minimizer and not bounded:
@@ -889,9 +889,11 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
         if distribution == 'cauchy_noise':
             # Convert noise variance to HWHM for cauchy distribution
             noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
-            tol = 1e-1
+            tol = 5e-1
         else:
-            tol = 1e3
+            tol = 5e3
+        if xd:
+            tol = tol * obsvis.shape[0]
     else:
         tol = None
 
