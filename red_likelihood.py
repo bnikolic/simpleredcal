@@ -833,7 +833,7 @@ def relative_nlogLklD(credg, distribution, obsvis, no_unq_bls, phase_reg_initp, 
 
 
 def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
-              noise=None, initp=None, xd=False, return_initp=False):
+              noise=None, initp=None, xd=False, return_initp=False, tol=None):
     """Do relative step of redundant calibration
 
     *DEFAULT IMPLEMENTATION*
@@ -863,6 +863,8 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
     :type xd: bool
     :param return_initp: Return optimization parameters that can be reused
     :type return_initp: bool
+    :param tol: Set the tolerance for minimization termination
+    :type tol: float
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -884,18 +886,24 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
             phase_reg_initp = initp
 
     distribution = check_ndist(distribution, noise)
-    if noise is not None:
-        # Increase tol since low noise values greatly increase the fun of minimization
-        if distribution == 'cauchy_noise':
-            # Convert noise variance to HWHM for cauchy distribution
-            noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
-            tol = 5e-1
+
+    if noise is not None and distribution == 'cauchy_noise':
+        # Convert noise variance to HWHM for Cauchy distribution
+        noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
+
+    if tol is None:
+        if noise is not None:
+            # Increase tol since low noise values greatly increase the fun of
+            # minimization
+            if distribution == 'cauchy_noise':
+                tol = 5e-1
+            else:
+                tol = 5e3
         else:
-            tol = 5e3
+            tol = 1e-5 # default for method='BFGS'
         if xd:
+            # Increase tol by the number of days for across days rel cal
             tol = tol * obsvis.shape[0]
-    else:
-        tol = None
 
     ff = jit(functools.partial(relative_nlogLklD, credg, distribution, obsvis, \
                                no_unq_bls, phase_reg_initp, noise, xd))
