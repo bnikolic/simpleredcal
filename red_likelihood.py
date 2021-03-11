@@ -699,16 +699,24 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                                no_unq_bls, coords, logamp, lovamp, tilt_reg, gphase_reg, \
                                ant_pos_arr, ref_ant_idx, phase_reg_initp, noise))
 
-    if noise is not None:
-        # Since low noise values greatly increase the function being minimized
-        if distribution != 'gaussian_noise':
-            # Convert noise variance to HWHM for cauchy distribution
-            noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
-            tol = 5e-1
+    if noise is not None and distribution != 'gaussian_noise':
+        # Convert noise variance to HWHM for Cauchy distribution
+        noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
+
+    if tol is None:
+        if noise is not None:
+            # Increase tol since low noise values greatly increase the fun of
+            # minimization
+            if distribution != 'gaussian_noise':
+                tol = 5e-1
+            else:
+                tol = 1e4
         else:
-            tol = 5e3
-    else:
-        tol = None
+            tol = 1e-5 # default for method='BFGS'
+        if xd:
+            # Increase tol by the number of days for across days rel cal
+            tol = tol * obsvis.shape[0]
+
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', tol=tol, \
                         options={'maxiter':max_nit})._asdict()
@@ -887,7 +895,7 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
 
     distribution = check_ndist(distribution, noise)
 
-    if noise is not None and distribution == 'cauchy_noise':
+    if noise is not None and distribution != 'gaussian_noise':
         # Convert noise variance to HWHM for Cauchy distribution
         noise = np.sqrt(2*np.log(2))*np.sqrt(noise)
 
@@ -895,10 +903,10 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
         if noise is not None:
             # Increase tol since low noise values greatly increase the fun of
             # minimization
-            if distribution == 'cauchy_noise':
+            if distribution != 'gaussian_noise':
                 tol = 5e-1
             else:
-                tol = 5e3
+                tol = 1e4
         else:
             tol = 1e-5 # default for method='BFGS'
         if xd:
