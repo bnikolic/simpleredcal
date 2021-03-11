@@ -708,7 +708,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
             # Increase tol since low noise values greatly increase the fun of
             # minimization
             if distribution != 'gaussian_noise':
-                tol = 5e-1
+                tol = 1e-1
             else:
                 tol = 1e4
         else:
@@ -904,7 +904,7 @@ def doRelCalD(credg, obsvis, no_unq_bls, no_ants, distribution='cauchy',
             # Increase tol since low noise values greatly increase the fun of
             # minimization
             if distribution != 'gaussian_noise':
-                tol = 5e-1
+                tol = 1e-1
             else:
                 tol = 1e4
         else:
