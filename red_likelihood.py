@@ -591,7 +591,7 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
              noise=None, bounded=False, logamp=False, lovamp=False, norm_gains=False, \
              tilt_reg=False, gphase_reg=False, ant_pos_arr=None, ref_ant_idx=None, \
              initp=None, max_nit=2000, return_initp=False, jax_minimizer=False, \
-             phase_reg_initp=False):
+             phase_reg_initp=False, tol=None):
     """Do relative step of redundant calibration
 
     Initial parameter guesses, if not specified, are 1+1j and 0+0j in cartesian
@@ -649,6 +649,8 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
     :param phase_reg_initp: Add regularization term to constrain the phases to be
     the same as the ones from the initial parameters
     :type phase_reg_initp: bool
+    :param tol: Set the tolerance for minimization termination
+    :type tol: float
 
     :return: Optimization result for the solved antenna gains and true sky
     visibilities
@@ -713,9 +715,6 @@ def doRelCal(credg, obsvis, no_unq_bls, no_ants, coords='cartesian', distributio
                 tol = 1e4
         else:
             tol = 1e-5 # default for method='BFGS'
-        if xd:
-            # Increase tol by the number of days for across days rel cal
-            tol = tol * obsvis.shape[0]
 
     if jax_minimizer and not bounded:
         res = jminimize(ff, initp, method='bfgs', tol=tol, \
