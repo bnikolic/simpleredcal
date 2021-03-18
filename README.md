@@ -10,5 +10,5 @@ As example, we works with and compare Gaussian and Cauchy assumed noise distribu
 Check out the [SimpleRedCal.ipynb](SimpleRedCal.ipynb) notebook for full example calibrations.
 
 ### Associated publications:
-[HERA Memorandum #84: A Generalized Approach to Redundant Calibration with JAX](http://reionization.org/wp-content/uploads/2013/03/HERA084__A_Generalized_Approach_to_Redundant_Calibration_with_JAX.pdf)
-[HERA Memorandum #94: Comparing Visibility Solutions from Relative Redundant Calibration by Degenerate Translation](http://reionization.org/manual_uploads/HERA094__Comparing_Visibility_Solutions_from_Relative_Redundant_Calibration_by_Degenerate_Translation.pdf)
+ - [HERA Memorandum #84: A Generalized Approach to Redundant Calibration with JAX](http://reionization.org/wp-content/uploads/2013/03/HERA084__A_Generalized_Approach_to_Redundant_Calibration_with_JAX.pdf)
+ - [HERA Memorandum #94: Comparing Visibility Solutions from Relative Redundant Calibration by Degenerate Translation](http://reionization.org/manual_uploads/HERA094__Comparing_Visibility_Solutions_from_Relative_Redundant_Calibration_by_Degenerate_Translation.pdf)
