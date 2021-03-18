@@ -5,7 +5,9 @@ The Hydrogen Epoch of Reionization Array (HERA) relies on redundant calibration 
 
 In this repository, we show generalization of this maximum likelihood estimation (MLE) to non-Gaussian statistics and without the need for linearization, which can be achieved at good computational performance with very little programming effort with the [JAX](https://github.com/google/jax) machine learning library. 
 
-As example, we works with and compare Gaussian and Cauchy assumed noise distributions in the calibration of HERA datasets, with the latter showing expected resilience to radio-frequency interference.
+As an example, we works with and compare Gaussian and Cauchy assumed noise distributions in the calibration of HERA datasets, with the latter showing expected resilience to radio-frequency interference.
+
+We also provide tools to compare redundantly calibrated visibilities across multiple days, which may have dissimilar degenerate parameters. We also extend redundant calibration to find the best estimates of the location and scale parameters for visibilities across multiple days.
 
 Check out the [SimpleRedCal.ipynb](SimpleRedCal.ipynb) notebook for full example calibrations.
 
