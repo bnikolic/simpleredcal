@@ -203,7 +203,8 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
 
 def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
                      clip_pctile=99, vmin=None, vmax=None, center=None, logv=False, \
-                     clip_bottom=False, cmap=sns.cm.rocket_r, figsize=(11,7)):
+                     clip_bottom=False, cmap=sns.cm.rocket_r, xoffset=None, \
+                     figsize=(11,7)):
     """Plot heatmap of results of redundant calibration
 
     :param df: Results dataframe
@@ -231,6 +232,8 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     :type clip_bottom: bool
     :param cmap: Colour mapping from data values to colour space
     :type cmap: str, matplotlib colormap name or object, list
+    :param xoffset: offset used for x-axis of heatmap
+    :type xoffset: int
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -265,8 +268,10 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     # xticks = numpy.arange(numpy.min(all_x), numpy.max(all_x), 50)
     # ax.set_xticks(xticks)
     # ax.set_xticklabels(xticks)
+    if xoffset is None:
+        xoffset = df.index.get_level_values(level=columns).unique().values[0]
     ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
-    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-50))
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=-xoffset))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
     ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
     plt.tight_layout()
