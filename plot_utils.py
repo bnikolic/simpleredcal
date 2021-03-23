@@ -89,6 +89,8 @@ def clip_ylim(df, col, clip_pctile, pos='top'):
     :type col: str
     :param clip_pctile: Percentile to clip the data
     :type clip_pctile: int, float
+    :param pos: {"top", "bottom"} to either ceil or floor the limit
+    :type pos: str
     """
     pos_dict = {'top':numpy.ceil, 'bottom':numpy.floor}
     values = df[col].values
@@ -243,7 +245,7 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
             clip_pctile_b = (100 - clip_pctile)/2
             clip_pctile = clip_pctile - clip_pctile_b
             vmin = clip_ylim(df, col, clip_pctile_b, pos='bottom')
-        vmax = clip_ylim(df, col, clip_pctile, pos='bottom')
+        vmax = clip_ylim(df, col, clip_pctile, pos='top')
         # vmax = numpy.ceil(numpy.nanpercentile(df[col].values, clip_pctile)*100)/100
         # vmin = numpy.floor(numpy.nanpercentile(df[col].values, clip_pctile_b)*100)/100
 
