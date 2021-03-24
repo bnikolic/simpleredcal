@@ -37,8 +37,8 @@ def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     plt.show()
 
 
-def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots',
-          **kwargs):
+def cplot(carr, figsize=(12, 8), split_ax=False, save_plot=False, save_dir='plots',
+          alpha=None, **kwargs):
     """Plot real and imaginary parts of complex array on same plot
 
     :param carr: Complex 1D array
@@ -54,15 +54,15 @@ def cplot(carr, figsize=(12,8), split_ax=False, save_plot=False, save_dir='plots
     """
     if not split_ax:
         plt.figure(figsize=figsize)
-        plt.plot(carr.real, label='Real')
-        plt.plot(carr.imag, label='Imag')
+        plt.plot(carr.real, label='Real', alpha=alpha)
+        plt.plot(carr.imag, label='Imag', alpha=alpha)
         for k, v in kwargs.items():
             getattr(plt, k)(v)
         plt.legend()
     else:
         fig, ax = plt.subplots(nrows=2, sharex=True, figsize=figsize)
-        ax[0].plot(carr.real)
-        ax[1].plot(carr.imag)
+        ax[0].plot(carr.real, alpha=alpha)
+        ax[1].plot(carr.imag, alpha=alpha)
         ax[0].set_ylabel('Real')
         ax[1].set_ylabel('Imag')
         plt.xlabel('Baseline')
@@ -114,7 +114,7 @@ def clip_ylim(df, col, clip_pctile, pos='top'):
 
 
 def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
-             ylabel='', title=None, figsize=(12,8)):
+             ylabel='', title=None, figsize=(12, 8)):
     """Plot attribute of calibration results
 
     :param df: Results dataframe
@@ -153,7 +153,7 @@ def plot_res(df, col, logy=False, clip=False, clip_pctile=99, ylim=None, \
 
 
 def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
-                     figsize=(12,8)):
+                     figsize=(12, 8)):
     """Plot attribute of calibration results, grouped by another attribute
 
     :param df: Results dataframe
@@ -204,7 +204,7 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
 def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
                      clip_pctile=99, vmin=None, vmax=None, center=None, logv=False, \
                      clip_bottom=False, cmap=sns.cm.rocket_r, xoffset=None, \
-                     figsize=(11,7)):
+                     figsize=(11, 7)):
     """Plot heatmap of results of redundant calibration
 
     :param df: Results dataframe
