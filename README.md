@@ -9,7 +9,7 @@ As an example, we works with and compare Gaussian and Cauchy assumed noise distr
 
 We also provide tools to compare redundantly calibrated visibilities across multiple days, which may have dissimilar degenerate parameters. We also extend redundant calibration to find the best estimates of the location and scale parameters for visibilities across multiple days.
 
-Check out the [SimpleRedCal.ipynb]https://nbviewer.jupyter.org/github/bnikolic/simpleredcal/blob/master/SimpleRedCal.ipynb) notebook for full example calibrations.
+Check out the [SimpleRedCal.ipynb](https://nbviewer.jupyter.org/github/bnikolic/simpleredcal/blob/master/SimpleRedCal.ipynb) notebook for full example calibrations.
 
 ### Associated publications:
  - [HERA Memorandum #84: A Generalized Approach to Redundant Calibration with JAX](http://reionization.org/wp-content/uploads/2013/03/HERA084__A_Generalized_Approach_to_Redundant_Calibration_with_JAX.pdf)
