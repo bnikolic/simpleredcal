@@ -166,13 +166,14 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
         for (i, j, pol) in data.keys():
             flags[(i, j, pol)] += cal_flags[(i, ap1)]
             flags[(i, j, pol)] += cal_flags[(j, ap2)]
-        # dict of masked data with updated flags
-        data = {k: numpy.ma.array(v, mask=flags[k], fill_value=np.nan) for k, v \
-                in data.items()}
-        data_size = np.asarray(list(data.values())).flatten().size
-        no_flags = np.asarray([d.mask for d in data.values()]).flatten().sum()
-        print('{} out of {} data points flagged for visibility dataset {}\n'.\
-              format(no_flags, data_size, os.path.basename(zen_path)))
+
+    # dict of masked data
+    data = {k: numpy.ma.array(v, mask=flags[k], fill_value=np.nan) for k, v \
+            in data.items()}
+    data_size = np.asarray(list(data.values())).flatten().size
+    no_flags = np.asarray([d.mask for d in data.values()]).flatten().sum()
+    print('{} out of {} data points flagged for visibility dataset {}\n'.\
+          format(no_flags, data_size, os.path.basename(zen_path)))
 
     # Collect data together
     no_tints, no_chans = data[list(data.keys())[0]].shape # get filtered data dimensions
