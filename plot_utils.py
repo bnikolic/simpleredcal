@@ -259,10 +259,10 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
     if logv:
         norm = LogNorm(vmin=vmin, vmax=vmax)
         ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center, \
-                         cbar_kws={"format": formatter}, norm=norm)
+                         cbar_kws={'format': formatter}, norm=norm)
     else:
         ax = sns.heatmap(piv, vmin=vmin, vmax=vmax, cmap=cmap, center=center,
-                         cbar_kws={"format": formatter})
+                         cbar_kws={'format': formatter})
 
     # all_x = numpy.unique(df.reset_index()[columns].values)
     # xticks = numpy.arange(numpy.min(all_x), numpy.max(all_x), 50)
@@ -281,7 +281,7 @@ def plot_res_heatmap(df, col, index='time_int', columns='freq', clip=False, \
 def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
                     xbase=50, ybase=5, vmin=None, center=None, cmap=sns.cm.rocket_r, \
                     sci_format=False, clip_rnd=100, retn_vlims=False, xoffset=-50,
-                    figsize=(14, 7)):
+                    cbar_lab=None, figsize=(14, 7)):
     """Plots heatmap of visibility-related data, with vmax set as a percentile
     of the dataframe
 
@@ -312,6 +312,8 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
     :type retn_vlims: bool
     :param xoffset: offset used for x-axis of heatmap
     :type xoffset: int
+    :param cbar_lab: Colorbar label
+    :type cbar_lab: str
     :param figsize: Figure size of plot
     :type figsize: tuple
 
@@ -339,7 +341,7 @@ def clipped_heatmap(arr, ylabel, xlabel='Frequency channel', clip_pctile=97, \
 
     fig, ax = plt.subplots(figsize=figsize)
     ax = sns.heatmap(arr, vmax=vmax, vmin=vmin, cmap=cmap, center=center, \
-                     cbar_kws={"format": formatter})
+                     cbar_kws={'format': formatter, 'label': cbar_lab})
     ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=xoffset))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(ybase))
@@ -395,7 +397,7 @@ def df_heatmap(df, xlabel=None, ylabel=None, title=None, xbase=None, ybase=None,
         formatter = None
 
     ax = sns.heatmap(df, cmap=cmap, center=center, vmin=vmin, vmax=vmax, \
-                     cbar_kws={"format": formatter})
+                     cbar_kws={'format': formatter})
     if xbase is not None:
         ax.xaxis.set_major_locator(ticker.MultipleLocator(xbase))
     xoffset = df.columns.values[0]
@@ -456,8 +458,8 @@ def antpos_map(values, flt_ant_pos, title=None, std_rng=2, center=None, \
             colour='white'
         ax.text(pos[0], pos[1], str(ant_no), va='center', ha='center', \
                 color=colour)
-    ax.set_xlabel("East-West [m]")
-    ax.set_ylabel("North-South [m]")
+    ax.set_xlabel('East-West [m]')
+    ax.set_ylabel('North-South [m]')
     ax.set_title(title)
     ax.axis('equal')
     fig.colorbar(im, ax=ax)
@@ -513,7 +515,7 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
 
     _, _, patchesu = plt.hist(values[~flags], range=(hist_start, hist_end+bin_width), \
                               bins=bin_range, density=False, alpha=0.65, label='Unflagged')
-    _, _, patchesf = plt.hist(values[flags],  range=(hist_start, hist_end+bin_width), \
+    _, _, patchesf = plt.hist(values[flags], range=(hist_start, hist_end+bin_width), \
                               bins=bin_range, density=False, alpha=0.65, label='Flagged')
 
     if lower_cut is not None:
@@ -545,6 +547,6 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     if logy:
         ax.set_yscale('log')
     plt.legend(loc='best', framealpha=0.5)
-    plt.ticklabel_format(axis="x", style="sci", scilimits=(-2, 2))
+    plt.ticklabel_format(axis='x', style='sci', scilimits=(-2, 2))
     plt.tight_layout()
     plt.show()
