@@ -6,6 +6,7 @@ import glob
 import os
 import pickle
 import re
+import warnings
 
 import numpy
 import pandas as pd
@@ -17,6 +18,11 @@ from hera_cal.redcal import get_reds
 from pyuvdata import utils as uvutils
 
 from red_likelihood import fltBad, groupBls, makeCArray, makeEArray
+
+warnings.filterwarnings('ignore', \
+    message='telescope_location is not set. Using known values for HERA.')
+warnings.filterwarnings('ignore', \
+    message='antenna_positions is not set. Using known values for HERA.')
 
 
 def find_zen_file(JD_time):
