@@ -205,7 +205,8 @@ def get_bad_ants(zen_path):
     :rtype: ndarray
      """
     jd_day = int(os.path.basename(zen_path).split('.')[1])
-    with open('bad_ants_idr2.pkl', 'rb') as f:
+    bad_ants_fn = os.path.join(os.path.dirname(__file__), 'bad_ants_idr2.pkl')
+    with open(bad_ants_fn, 'rb') as f:
         bad_ants_dict = pickle.load(f)
     return bad_ants_dict[jd_day]
 
