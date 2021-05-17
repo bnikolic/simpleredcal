@@ -34,7 +34,8 @@ def union_bad_ants(JDs):
     :return: Union of bad antennas for JDs
     :rtype: ndarray
     """
-    with open('bad_ants_idr2.pkl', 'rb') as f:
+    bad_ants_fn = os.path.join(os.path.dirname(__file__), 'bad_ants_idr2.pkl')
+    with open(bad_ants_fn, 'rb') as f:
         bad_ants_dict = pickle.load(f)
     bad_ants = np.array([], dtype=int)
     for JD in JDs:
