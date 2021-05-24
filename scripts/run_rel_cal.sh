@@ -14,5 +14,11 @@
 #PBS -j oe
 #PBS -o rel_cal.2458098.43869.ee.gaussian.out
 
+cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+
+echo "start: $(date)"
+
 /users/mmolnar/anaconda3/envs/hera/bin/python rel_cal.py '2458098.43869' --pol 'ee' \
 --flag_type 'first' --dist 'gaussian' --initp_jd 2458099 --out_dir 'rel_dfs' --rel_dir 'rel_dfs'
+
+echo "end: $(date)"

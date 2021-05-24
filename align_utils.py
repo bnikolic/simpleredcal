@@ -1,5 +1,6 @@
 """Utility functions for alignment of dataframes"""
 
+import os
 
 import pandas as pd
 import numpy
@@ -46,7 +47,8 @@ def align_df(df_type, JD_time, JD_comp, dir_path, ndist, pol, JD_anchor=2458099)
     JD_timea = check_jdt(JD_timea)
 
     # aligning datasets in LAST
-    last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+    jd_lst_map_fn = os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl')
+    last_df = pd.read_pickle(jd_lst_map_fn)
     last1 = last_df[last_df['JD_time'] == float(JD_time)]['LASTs'].values[0]
     last2 = last_df[last_df['JD_time'] == float(JD_timea)]['LASTs'].values[0]
     _, offset = find_nearest(last2, last1[0])

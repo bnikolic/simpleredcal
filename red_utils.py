@@ -316,7 +316,8 @@ def match_lst(JD_time, JD_day, tint=0):
     """
     if isinstance(JD_time, str):
         JD_time = float(JD_time)
-    df = pd.read_pickle('jd_lst_map_idr2.pkl') # df of JD and LAST information
+    jd_lst_map_fn = os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl')
+    df = pd.read_pickle(jd_lst_map_fn) # df of JD and LAST information
     lst = df.loc[df['JD_time'] == JD_time]['LASTs'].values[0][tint] # take 1st LAST
     tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
     tgt_jd_time, _ = find_nearest(df['JD_time'].values, tgt, condition='leq')

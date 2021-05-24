@@ -10,10 +10,15 @@
 #PBS -d /lustre/aoc/projects/hera/mmolnar/simpleredcal # Working directory (PBS_O_WORKDIR) set to your Lustre area
 #PBS -m bea # Send email when Jobs end or abort
 #PBS -l nodes=1:ppn=4 # default is 1 core on 1 node
-#PBS -l walltime=200:00:00
+#PBS -l walltime=100:00:00
 #PBS -j oe
-#PBS -o xd_rel_cal.2458098.43869.ee.cauchy.out
+#PBS -o opt_cal.2458098.43869.ee.gaussian.out
 
-/users/mmolnar/anaconda3/envs/hera/bin/python xd_rel_cal.py '2458098.43869' \
---jds 'idr2_jdsx' --pol 'ee' --flag_type 'first' --dist 'cauchy' \
---out_dir 'xd_rel_dfs' --chans '500~700'
+cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+
+echo "start: $(date)"
+
+/users/mmolnar/anaconda3/envs/hera/bin/python opt_cal.py '2458098.43869' --pol 'ee' \
+--dist 'gaussian' --rel_dir 'rel_dfs' --out_dir 'opt_dfs'
+
+echo "end: $(date)"
