@@ -14,3 +14,4 @@ csv_res/
 aligned_red_deg*
 idr2_flags.npz
 b2f2*.npz
+b2f2_flags/
