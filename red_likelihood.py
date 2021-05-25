@@ -143,6 +143,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     # reorder keys such that (i, j, pol), with j>i
     data = dict(sorted({((j, i, p) if i > j else (i, j, p)): v for \
                         (i, j, p), v in data.items()}.items()))
+    flags = dict(sorted({((j, i, p) if i > j else (i, j, p)): v for \
+                        (i, j, p), v in flags.items()}.items()))
 
     no_tints = hd.Ntimes
     no_chans = hd.Nfreqs
