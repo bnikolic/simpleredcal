@@ -75,6 +75,8 @@ def main():
                         type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new csv file')
+    parser.add_argument('-k', '--compression', required=False, default=None, metavar='K', \
+                        type=str, help='Compression to use when pickling results dataframe')
     args = parser.parse_args()
 
     startTime = datetime.datetime.now()
@@ -279,7 +281,10 @@ def main():
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
-        df.to_pickle(out_pkl)
+        if args.compression is not None:
+            out_pkl += '.{}'.format(args.compression)
+            print('{} compression used in pickling the dataframe'.format(args.compression))
+        df.to_pickle(out_pkl, compression=args.compression)
         print('Degenerate fitting results dataframe pickled to {}'.format(out_pkl))
 
     print('Script run time: {}'.format(datetime.datetime.now() - startTime))
