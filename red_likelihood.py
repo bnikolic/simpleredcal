@@ -12,6 +12,7 @@ from scipy.special import gamma
 from scipy.stats import circmean
 
 import hera_cal
+from hera_cal.apply_cal import calibrate_in_place
 from hera_cal.io import HERACal, HERAData
 from hera_cal.noise import predict_noise_variance_from_autos
 from hera_cal.redcal import get_reds
@@ -89,7 +90,7 @@ def relabelAnts(redg):
 
 
 def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
-               flag_path=None, noise=False):
+               flag_path=None, noise=False, cal_path=None):
     """Returns redundant baseline grouping and reformatted dataset, with
     external flags applied, if specified
 
@@ -107,6 +108,8 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     :type flag_path: str, None
     :param noise: Also calculate noise from autocorrelations
     :type nois: bool
+    :param cal_path: Path of calfits file to use for calibration
+    :type cal_path: str, None
 
     :return hd: HERAData class
     :rtype hd: HERAData class
@@ -124,16 +127,26 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
         chans = np.asarray([chans])
     if isinstance(tints, int):
         tints = np.asarray([tints])
+
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
     data, flags, _ = hd.read(freq_chans=chans, polarizations=[pol])
+
+    # apply calibration if specified
+    if cal_path is not None:
+        hc = HERACal(cal_path)
+        cal_gains, cal_flags, _, _ = hc.read(freq_chans=chans, pols=[pol])
+        calibrate_in_place(data, cal_gains, data_flags=flags, cal_flags=cal_flags)
+
     if noise:
         ndata = deepcopy(data)
+
     # filter bls by bad antennas
     if bad_ants is not None:
         reds = fltBad(reds, bad_ants)
         data = {k: v for k, v in data.items() if not any(i in bad_ants \
                 for i in k[:2])}
+
     redg = groupBls(reds) # baseline grouping
 
     data = {k: v for k, v in data.items() if k[0] != k[1]} # flt autos
