@@ -44,7 +44,7 @@ def union_bad_ants(JDs):
 
 
 def suppressOutput(func):
-    """Utility function that blocks print calls by writing to 
+    """Utility function that blocks print calls by writing to
     the null device"""
     def func_wrapper(*args, **kwargs):
         with open(os.devnull, 'w') as devNull:
@@ -129,7 +129,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     for jd_i in JDs:
         JD_time_ia = match_lst(JD_time, jd_i)
         # aligning datasets in LAST
-        last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+        last_df = pd.read_pickle(os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl'))
         last1 = last_df[last_df['JD_time'] == float(JD_time)]['LASTs'].values[0]
         last2 = last_df[last_df['JD_time'] == float(JD_time_ia)]['LASTs'].values[0]
         _, offset = find_nearest(last2, last1[0])
