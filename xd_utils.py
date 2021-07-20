@@ -57,7 +57,7 @@ def suppressOutput(func):
 
 
 def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
-                 use_flags='first', noise=False, verbose=False):
+                 use_flags='first', noise=False, use_cal=None, verbose=False):
     """Returns redundant baseline grouping and reformatted dataset, with
     external flags applied, if specified
 
@@ -77,6 +77,8 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     :type use_flags: str
     :param noise: Also calculate noise from autocorrelations
     :type noise: bool
+    :param use_cal: calfits file extension to use to calibrate data
+    :type use_cal: str, None
     :param verbose: Print data gathering steps for each dataset
     :type verbose: bool
 
@@ -107,13 +109,18 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     else:
         bad_ants = None
 
+    if use_cal is None:
+        cal_path = None
+    else:
+        cal_path = find_flag_file(JD_time, use_cal)
+
     if not verbose:
         grp_data = suppressOutput(group_data)
     else:
         grp_data = group_data
 
     grp = grp_data(zen_fn, pol, chans=chans, tints=tints, bad_ants=bad_ants,
-                     flag_path=flags_fn, noise=noise)
+                     flag_path=flags_fn, noise=noise, cal_path=cal_path)
     _, redg, cMData = grp[:3]
 
     cMData = cMData[np.newaxis, :]
@@ -150,8 +157,13 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         JD_time_ia = check_jdt(JD_time_ia)
         zen_fn_ia = find_zen_file(JD_time_ia)
         flags_fn_ia = find_flag_file(JD_time_ia, use_flags)
+        if use_cal is not None:
+            cal_path_ia = find_flag_file(JD_time_ia, use_cal)
+        else:
+            cal_path_ia = None
         grp_a = grp_data(zen_fn_ia, pol, chans=chans, tints=tints_ia, \
-                         bad_ants=bad_ants, flag_path=flags_fn_ia, noise=noise)
+                         bad_ants=bad_ants, flag_path=flags_fn_ia, noise=noise, \
+                         cal_path=cal_path_ia)
         cMData_ia = grp_a[2]
 
         if not single_dataset:
@@ -160,8 +172,13 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
             JD_time_ib = check_jdt(JD_time_ib)
             zen_fn_ib = find_zen_file(JD_time_ib)
             flags_fn_ib = find_flag_file(JD_time_ib, use_flags)
+            if use_cal is not None:
+                cal_path_ib = find_flag_file(JD_time_ib, use_cal)
+            else:
+                cal_path_ib = None
             grp_b = grp_data(zen_fn_ib, pol, chans=chans, tints=tints_ib, \
-                             bad_ants=bad_ants, flag_path=flags_fn_ib, noise=noise)
+                             bad_ants=bad_ants, flag_path=flags_fn_ib, \
+                             noise=noise, cal_path=cal_path_ib)
             cMData_ib = grp_b[2]
 
             cMData_i = numpy.ma.concatenate((cMData_ia, cMData_ib), axis=1)
