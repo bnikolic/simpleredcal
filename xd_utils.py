@@ -5,11 +5,14 @@ import os
 import pickle
 import sys
 import warnings
+from collections import OrderedDict as odict
 
 import numpy
 import pandas as pd
 
+from hera_cal.datacontainer import DataContainer
 from hera_cal.io import HERAData
+from hera_cal.utils import lst_rephase
 
 from jax.config import config
 config.update('jax_enable_x64', True)
@@ -57,7 +60,8 @@ def suppressOutput(func):
 
 
 def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
-                 use_flags='first', noise=False, use_cal=None, verbose=False):
+                 use_flags='first', noise=False, use_cal=None, rephase=False, \
+                 verbose=False):
     """Returns redundant baseline grouping and reformatted dataset, with
     external flags applied, if specified
 
@@ -79,6 +83,9 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     :type noise: bool
     :param use_cal: calfits file extension to use to calibrate data
     :type use_cal: str, None
+    :param rephase: phase data to centre of the LST bin before binning (centre
+    of the bin being the mean LST for each row across JDs)
+    :type rephase: bool
     :param verbose: Print data gathering steps for each dataset
     :type verbose: bool
 
@@ -119,8 +126,12 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     else:
         grp_data = group_data
 
+    # for rephasing
+    comb_lsts = numpy.empty((len(JDs), len(tints)))
+    comb_lsts[0, :] = hd.lsts[tints]
+
     grp = grp_data(zen_fn, pol, chans=chans, tints=tints, bad_ants=bad_ants,
-                     flag_path=flags_fn, noise=noise, cal_path=cal_path)
+                   flag_path=flags_fn, noise=noise, cal_path=cal_path)
     _, redg, cMData = grp[:3]
 
     cMData = cMData[np.newaxis, :]
@@ -131,6 +142,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     JD_day = int(float(JD_time))
     if JD_day in JDs:
         JDs = list(JDs)
+        JDs_arr = numpy.array(JDs)
         JDs.remove(JD_day)
 
     for jd_i in JDs:
@@ -166,6 +178,8 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
                          cal_path=cal_path_ia)
         cMData_ia = grp_a[2]
 
+        lsts_i = grp_a[0].lsts[numpy.asarray(tints_ia)]
+
         if not single_dataset:
             next_row = numpy.where(last_df['JD_time'] == float(JD_time_ia))[0][0] + 1
             JD_time_ib = last_df.iloc[next_row]['JD_time']
@@ -181,9 +195,13 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
                              noise=noise, cal_path=cal_path_ib)
             cMData_ib = grp_b[2]
 
+            lsts_i = numpy.append(lsts_i, grp_b[0].lsts[numpy.asarray(tints_ib)])
+
             cMData_i = numpy.ma.concatenate((cMData_ia, cMData_ib), axis=1)
         else:
             cMData_i = cMData_ia
+
+        comb_lsts[JDs.index(jd_i)+1, :] = lsts_i
 
         cMData_i = cMData_i[np.newaxis, :]
         cMData = numpy.ma.concatenate((cMData, cMData_i), axis=0)
@@ -197,6 +215,36 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
                 cNoise_i = cNoise_ia
             cNoise_i = cNoise_i[np.newaxis, :]
             cNoise = np.concatenate((cNoise, cNoise_i), axis=0)
+
+    if rephase:
+        lst_bin_centres = np.mean(comb_lsts, axis=0)
+
+        freq_arr = hd.freqs[chans]
+        cData_rph = numpy.empty((JDs_arr.size, freq_arr.size, len(tints), redg.shape[0]), \
+                                dtype=complex)
+
+        # get rephased data for each day
+        for jd_idx, jd_i in enumerate(JDs_arr):
+            # convert to DataContainer to feed into lst_rephase hera_cal function
+            data_cont = odict()
+            for bl_idx, bl in enumerate(redg[:, 1:]):
+                data_cont[(bl[0], bl[1], pol)] = cMData.data[jd_idx, ..., bl_idx].transpose()
+            data_cont = DataContainer(data_cont)
+
+            if jd_idx == 0:
+                # only need to compute once since ant positions fixed
+                bls = odict([(k, hd.antpos[k[0]] - hd.antpos[k[1]]) for k in data_cont.keys()])
+
+            # lst deltas to bin centre of aligned array
+            dlst = numpy.asarray(lst_bin_centres - comb_lsts[jd_idx, :])
+
+            # rephase data here
+            data_cont = lst_rephase(data_cont, bls, freq_arr, dlst, inplace=False, array=False)
+
+            for bl_idx, bl in enumerate(redg[:, 1:]):
+                cData_rph[jd_idx, ..., bl_idx] = data_cont[(bl[0], bl[1], pol)].transpose()
+
+        cMData = numpy.ma.masked_array(cData_rph, mask=cMData.mask, fill_value=np.nan)
 
     if noise:
         return hd, redg, cMData, cNoise
