@@ -220,7 +220,10 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         lst_bin_centres = np.mean(comb_lsts, axis=0)
         hd.lsts = lst_bin_centres
 
+        if chans is None:
+            chans = np.arange(hd.Nfreqs)
         freq_arr = hd.freqs[numpy.asarray(chans)]
+
         cData_rph = numpy.empty((JDs_arr.size, freq_arr.size, len(tints), redg.shape[0]), \
                                 dtype=complex)
 
