@@ -128,7 +128,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
 
     # for rephasing
     comb_lsts = numpy.empty((len(JDs), len(tints)))
-    comb_lsts[0, :] = hd.lsts[tints]
+    comb_lsts[0, :] = hd.lsts[numpy.asarray(tints)]
 
     grp = grp_data(zen_fn, pol, chans=chans, tints=tints, bad_ants=bad_ants,
                    flag_path=flags_fn, noise=noise, cal_path=cal_path)
