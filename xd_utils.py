@@ -154,7 +154,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
         _, offset = find_nearest(last2, last1[0])
         tints_i = (tints + offset)%60
         scnd_dataset = all(tints+offset > hd.Ntimes-1)
-        single_dataset = all(tints+offset < hd.Ntimes-1) or scnd_dataset
+        single_dataset = all(tints+offset <= hd.Ntimes-1) or scnd_dataset
 
         if not single_dataset:
             tints_ia, tints_ib = np.split(tints_i, np.where(tints_i == 0)[0])
