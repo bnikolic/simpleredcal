@@ -19,8 +19,8 @@ config.update('jax_enable_x64', True)
 from jax import numpy as np
 
 from red_likelihood import group_data
-from red_utils import check_jdt, find_flag_file, find_nearest, find_zen_file, \
-match_lst
+from red_utils import BADANTSPATH, check_jdt, find_flag_file, find_nearest, \
+find_zen_file, JD2LSTPATH, lst_to_jd_time, match_lst
 
 warnings.filterwarnings('ignore', \
     message='telescope_location is not set. Using known values for HERA.')
@@ -37,8 +37,7 @@ def union_bad_ants(JDs):
     :return: Union of bad antennas for JDs
     :rtype: ndarray
     """
-    bad_ants_fn = os.path.join(os.path.dirname(__file__), 'bad_ants_idr2.pkl')
-    with open(bad_ants_fn, 'rb') as f:
+    with open(BADANTSPATH, 'rb') as f:
         bad_ants_dict = pickle.load(f)
     bad_ants = np.array([], dtype=int)
     for JD in JDs:
@@ -93,12 +92,11 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     :rtype hd: HERAData class
     :return redg: Grouped baselines, as returned by groupBls
     :rtype redg: ndarray
-    :return cdata: Grouped visibilities with flags in numpy MaskedArray format,
+    :return cMData: Grouped visibilities with flags in numpy MaskedArray format,
     with format consistent with redg and dimensions (freq chans,
     time integrations, baselines)
-    :rtype cdata: MaskedArray
+    :rtype cMData: MaskedArray
     """
-
     if isinstance(chans, int):
         chans = np.asarray([chans])
     if isinstance(tints, int):
@@ -148,7 +146,7 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     for jd_i in JDs:
         JD_time_ia = match_lst(JD_time, jd_i)
         # aligning datasets in LAST
-        last_df = pd.read_pickle(os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl'))
+        last_df = pd.read_pickle(JD2LSTPATH)
         last1 = last_df[last_df['JD_time'] == float(JD_time)]['LASTs'].values[0]
         last2 = last_df[last_df['JD_time'] == float(JD_time_ia)]['LASTs'].values[0]
         _, offset = find_nearest(last2, last1[0])
@@ -249,6 +247,94 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
                 cData_rph[jd_idx, ..., bl_idx] = data_cont[(bl[0], bl[1], pol)].transpose()
 
         cMData = numpy.ma.masked_array(cData_rph, mask=cMData.mask, fill_value=np.nan)
+
+    if noise:
+        return hd, redg, cMData, cNoise
+    else:
+        return hd, redg, cMData
+
+
+def XDgroup_data_lst(lst_range, JDs, pol, chans=None, bad_ants=True, \
+                     use_flags='first', noise=False, use_cal=None, rephase=False, \
+                     verbose=False):
+    """Returns redundant baseline grouping and reformatted dataset, with
+    external flags applied, if specified, for a given LST range
+
+    :param lst_range: LST start and end
+    :type lst_range: tuple
+    :param JDs: Julian days of data
+    :type JDs: list, ndarray
+    :param pol: Polarization of data
+    :type pol: str
+    :param chans: Frequency channel(s) {0, 1023} (None to choose all)
+    :type chans: array-like, int, or None
+    :param bad_ants: Flag known bad antennas, optional
+    :type bad_ants: bool
+    :param use_flags: Use flags to mask data
+    :type use_flags: str
+    :param noise: Also calculate noise from autocorrelations
+    :type noise: bool
+    :param use_cal: calfits file extension to use to calibrate data
+    :type use_cal: str, None
+    :param rephase: phase data to centre of the LST bin before binning (centre
+    of the bin being the mean LST for each row across JDs)
+    :type rephase: bool
+    :param verbose: Print data gathering steps for each dataset
+    :type verbose: bool
+
+    :return hd: HERAData class
+    :rtype hd: HERAData class
+    :return redg: Grouped baselines, as returned by groupBls
+    :rtype redg: ndarray
+    :return cMData: Grouped visibilities with flags in numpy MaskedArray format,
+    with format consistent with redg and dimensions (freq chans,
+    time integrations, baselines)
+    :rtype cMData: MaskedArray
+    """
+    last_map = pd.read_pickle(JD2LSTPATH)
+
+    jd_start = find_nearest(last_map.loc[JDs[0]]['JD_time'].values, \
+        lst_to_jd_time(lst_range[0], JDs[0]), condition='leq')[0]
+
+    jd_end = find_nearest(last_map.loc[JDs[0]]['JD_time'].values, \
+        lst_to_jd_time(lst_range[1], JDs[0]), condition='leq')[0]
+
+    jdts = last_map[(last_map['JD_time'] >= jd_start) & \
+                    (last_map['JD_time'] <= jd_end)]['JD_time'].values
+
+    lsts = []
+    for i, jdt in enumerate(jdts):
+        lsts_jdt = last_map[last_map['JD_time'] == jdts[i]]['LASTs'].values[0]
+        if i == 0:
+            tint_s = find_nearest(lsts_jdt, lst_range[0], condition='leq')[1]
+            if len(jdts) == 1:
+                tint_e = find_nearest(lsts_jdt, lst_range[1], condition='geq')[1]+1
+                tints = np.arange(lsts_jdt.size)[tint_s:tint_e]
+            else:
+                tints = np.arange(lsts_jdt.size)[tint_s:]
+        elif i == len(jdts) - 1:
+            tint_e = find_nearest(lsts_jdt, lst_range[1], condition='geq')[1]
+            tints = np.arange(lsts_jdt.size)[:tint_e]
+        else:
+            tints = None
+
+        grp = XDgroup_data(jdt, JDs, pol, chans=chans, tints=tints, bad_ants=bad_ants, \
+            use_flags=use_flags, noise=noise, use_cal=use_cal, rephase=rephase, \
+            verbose=verbose)
+
+        lsts.append(grp[0].lsts)
+
+        if i == 0:
+            cMData = grp[2]
+            hd, redg = grp[:2]
+            if noise:
+                cNoise = grp[3]
+        else:
+            cMData = numpy.ma.concatenate((cMData, grp[2]), axis=2)
+            if noise:
+                cNoise = np.concatenate((cNoise, grp[3]), axis=2)
+
+    hd.lsts = numpy.array(lsts).flatten()
 
     if noise:
         return hd, redg, cMData, cNoise
