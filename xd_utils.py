@@ -334,7 +334,7 @@ def XDgroup_data_lst(lst_range, JDs, pol, chans=None, bad_ants=True, \
             if noise:
                 cNoise = np.concatenate((cNoise, grp[3]), axis=2)
 
-    hd.lsts = numpy.array(lsts).flatten()
+    hd.lsts = numpy.concatenate(lsts).ravel()
 
     if noise:
         return hd, redg, cMData, cNoise
