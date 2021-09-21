@@ -32,7 +32,7 @@ from hera_cal.io import HERAData
 from fit_diagnostics import append_residuals_rel
 from red_likelihood import doRelCalD, group_data, relabelAnts
 from red_utils import check_jdt, find_flag_file, find_nearest, find_rel_df, \
-find_zen_file, fn_format, get_bad_ants, match_lst, mod_str_arg, new_fn
+find_zen_file, fn_format, get_bad_ants, JD2LSTPATH, match_lst, mod_str_arg, new_fn
 
 
 def main():
@@ -200,7 +200,7 @@ def main():
             if isinstance(jd_time2, str):
                 jd_time2 = float(jd_time2)
 
-            last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+            last_df = pd.read_pickle(JD2LSTPATH)
             last1 = last_df[last_df['JD_time'] == float(args.jd_time)]['LASTs'].values[0]
             last2 = last_df[last_df['JD_time'] == jd_time2]['LASTs'].values[0]
             _, offset = find_nearest(last2, last1[0])

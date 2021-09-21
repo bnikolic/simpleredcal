@@ -19,6 +19,9 @@ from pyuvdata import utils as uvutils
 
 from red_likelihood import fltBad, groupBls, makeCArray, makeEArray
 
+BADANTSPATH = os.path.join(os.path.dirname(__file__), 'bad_ants_idr2.pkl')
+JD2LSTPATH = os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl')
+
 warnings.filterwarnings('ignore', \
     message='telescope_location is not set. Using known values for HERA.')
 warnings.filterwarnings('ignore', \
@@ -205,8 +208,7 @@ def get_bad_ants(zen_path):
     :rtype: ndarray
      """
     jd_day = int(os.path.basename(zen_path).split('.')[1])
-    bad_ants_fn = os.path.join(os.path.dirname(__file__), 'bad_ants_idr2.pkl')
-    with open(bad_ants_fn, 'rb') as f:
+    with open(BADANTSPATH, 'rb') as f:
         bad_ants_dict = pickle.load(f)
     return bad_ants_dict[jd_day]
 
@@ -316,8 +318,7 @@ def match_lst(JD_time, JD_day, tint=0):
     """
     if isinstance(JD_time, str):
         JD_time = float(JD_time)
-    jd_lst_map_fn = os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl')
-    df = pd.read_pickle(jd_lst_map_fn) # df of JD and LAST information
+    df = pd.read_pickle(JD2LSTPATH) # df of JD and LAST information
     lst = df.loc[df['JD_time'] == JD_time]['LASTs'].values[0][tint] # take 1st LAST
     tgt = lst_to_jd_time(lst, JD_day, telescope='HERA')
     tgt_jd_time, _ = find_nearest(df['JD_time'].values, tgt, condition='leq')

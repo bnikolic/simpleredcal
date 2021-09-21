@@ -5,7 +5,8 @@ import os
 import pandas as pd
 import numpy
 
-from red_utils import check_jdt, find_deg_df, find_nearest, find_rel_df, match_lst
+from red_utils import check_jdt, find_deg_df, find_nearest, find_rel_df, \
+JD2LSTPATH, match_lst
 
 
 # Note that 2458109 has 1 fewer antennas, as antenna 14 is flagged
@@ -47,8 +48,7 @@ def align_df(df_type, JD_time, JD_comp, dir_path, ndist, pol, JD_anchor=2458099)
     JD_timea = check_jdt(JD_timea)
 
     # aligning datasets in LAST
-    jd_lst_map_fn = os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl')
-    last_df = pd.read_pickle(jd_lst_map_fn)
+    last_df = pd.read_pickle(JD2LSTPATH)
     last1 = last_df[last_df['JD_time'] == float(JD_time)]['LASTs'].values[0]
     last2 = last_df[last_df['JD_time'] == float(JD_timea)]['LASTs'].values[0]
     _, offset = find_nearest(last2, last1[0])

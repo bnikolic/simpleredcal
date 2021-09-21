@@ -21,7 +21,7 @@ import numpy
 
 from align_utils import align_df, idr2_jds, idr2_jdsx
 from red_likelihood import decomposeCArray, degVis, makeCArray, red_ant_sep
-from red_utils import find_deg_df, find_rel_df, fn_format, mod_str_arg
+from red_utils import find_deg_df, find_rel_df, fn_format, JD2LSTPATH, mod_str_arg
 
 
 def main():
@@ -58,7 +58,7 @@ def main():
 
     out_fn = args.out
     if out_fn is None:
-        last_df = pd.read_pickle('jd_lst_map_idr2.pkl')
+        last_df = pd.read_pickle(JD2LSTPATH)
         last = last_df[last_df['JD_time'] == float(args.jd_time)]['LASTs'].values[0][0]
         out_fn = 'aligned_red_deg.{}.{}.{}'.format('{:.4f}'.format(last), \
                                                 args.pol, args.dist)
