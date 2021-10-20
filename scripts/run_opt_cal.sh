@@ -6,7 +6,7 @@
 # Don't put any commands before the #PBS options or they will not work
 #
 #PBS -V # Export all environment variables from the qsub commands environment to the batch job.
-#PBS -l mem=64gb,pvmem=96gb # Amount of memory needed by each processor (ppn) in the job.
+#PBS -l mem=64gb # Total amount of memory needed.
 #PBS -d /lustre/aoc/projects/hera/mmolnar/simpleredcal # Working directory (PBS_O_WORKDIR) set to your Lustre area
 #PBS -m bea # Send email when Jobs end or abort
 #PBS -l nodes=1:ppn=4 # default is 1 core on 1 node
