@@ -260,7 +260,7 @@ def XDgroup_data_lst(lst_range, JDs, pol, chans=None, bad_ants=True, \
     """Returns redundant baseline grouping and reformatted dataset, with
     external flags applied, if specified, for a given LST range
 
-    :param lst_range: LST start and end
+    :param lst_range: LST start and end, in radians
     :type lst_range: tuple
     :param JDs: Julian days of data
     :type JDs: list, ndarray
