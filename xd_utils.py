@@ -45,6 +45,23 @@ def union_bad_ants(JDs):
     return np.sort(np.unique(bad_ants))
 
 
+def intersection_bad_ants(JDs):
+    """Return the common bad antennas for the specified JDs
+
+    :param: Julian Days
+    :type: ndarray, list
+
+    :return: Intersection of bad antennas for JDs
+    :rtype: ndarray
+    """
+    with open(BADANTSPATH, 'rb') as f:
+        bad_ants_dict = pickle.load(f)
+    bad_ants = []
+    for JD in JDs:
+        bad_ants.append(bad_ants_dict[JD].tolist())
+    return np.array(sorted(list(set.intersection(*map(set, bad_ants)))))
+
+
 def suppressOutput(func):
     """Utility function that blocks print calls by writing to
     the null device"""
