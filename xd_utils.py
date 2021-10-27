@@ -28,38 +28,36 @@ warnings.filterwarnings('ignore', \
     message='antenna_positions is not set. Using known values for HERA.')
 
 
-def union_bad_ants(JDs):
-    """Return all the bad antennas for the specified JDs
+def xd_bad_ants(JDs, overlap='union'):
+    """Return all bad antennas for the specified JDs
 
-    :param: Julian Days
-    :type: ndarray, list
+    :param JDs: Julian Days
+    :type JDs: ndarray, list
+    :param overlap: how to combine the collection of antennas {"union", "intersection"}
+    :type overlap: str
 
-    :return: Union of bad antennas for JDs
+    :return: Bad antennas for specified JDs
     :rtype: ndarray
     """
     with open(BADANTSPATH, 'rb') as f:
         bad_ants_dict = pickle.load(f)
-    bad_ants = np.array([], dtype=int)
-    for JD in JDs:
-        bad_ants = np.append(bad_ants, bad_ants_dict[JD])
-    return np.sort(np.unique(bad_ants))
+    if overlap == 'union':
+        bad_ants = np.array([], dtype=int)
+        for JD in JDs:
+            bad_ants = np.append(bad_ants, bad_ants_dict[JD])
+        return np.sort(np.unique(bad_ants))
+    elif overlap == 'intersection':
+        bad_ants = []
+        for JD in JDs:
+            bad_ants.append(bad_ants_dict[JD].tolist())
+        return np.array(sorted(list(set.intersection(*map(set, bad_ants)))))
+    else:
+        raise ValueError('overlap must be one of {"union", "intersection"}')
 
 
-def intersection_bad_ants(JDs):
-    """Return the common bad antennas for the specified JDs
+union_bad_ants = lambda JDs: xd_bad_ants(JDs, overlap='union')
 
-    :param: Julian Days
-    :type: ndarray, list
-
-    :return: Intersection of bad antennas for JDs
-    :rtype: ndarray
-    """
-    with open(BADANTSPATH, 'rb') as f:
-        bad_ants_dict = pickle.load(f)
-    bad_ants = []
-    for JD in JDs:
-        bad_ants.append(bad_ants_dict[JD].tolist())
-    return np.array(sorted(list(set.intersection(*map(set, bad_ants)))))
+intersection_bad_ants = lambda JDs: xd_bad_ants(JDs, overlap='intersection')
 
 
 def suppressOutput(func):
@@ -91,8 +89,10 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     :type chans: array-like, int, or None
     :param tints: Time integrations {0, 59} (None to choose all)
     :type tints: array-like, int, or None
-    :param bad_ants: Flag known bad antennas, optional
-    :type bad_ants: bool
+    :param bad_ants: Flag known bad antennas. Either a bool, or specify {"union",
+    "intersection"} for how antennas from JDs should be collected. True defaults
+    to "union".
+    :type bad_ants: bool, str
     :param use_flags: Use flags to mask data
     :type use_flags: str
     :param noise: Also calculate noise from autocorrelations
@@ -126,8 +126,13 @@ def XDgroup_data(JD_time, JDs, pol, chans=None, tints=None, bad_ants=True, \
     if tints is None:
         tints = np.arange(hd.Ntimes)
 
-    if bad_ants:
-        bad_ants = union_bad_ants(JDs)
+    if isinstance(bad_ants, bool):
+        if bad_ants:
+            bad_ants = xd_bad_ants(JDs, overlap='union')
+        else:
+            bad_ants = None
+    elif isinstance(bad_ants, str):
+        bad_ants = xd_bad_ants(JDs, overlap=bad_ants)
     else:
         bad_ants = None
 
