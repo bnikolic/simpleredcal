@@ -14,11 +14,15 @@
 #PBS -j oe
 #PBS -o deg_cal.2458098.43869.ee.jd.2458099.gaussian.out
 
-cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+source ~/.bashrc
+
+conda activate hera
 
 echo "start: $(date)"
 
-/users/mmolnar/anaconda3/envs/hera/bin/python deg_cal.py '2458098.43869' --deg_dim 'jd' \
+cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+
+python deg_cal.py '2458098.43869' --deg_dim 'jd' \
 --pol 'ee' --dist 'gaussian' --coords 'cartesian' --tgt_jd 2458099 \
 --rel_dir 'rel_dfs' --out_dir 'deg_dfs'
 

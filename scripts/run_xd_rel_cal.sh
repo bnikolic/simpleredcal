@@ -14,12 +14,15 @@
 #PBS -j oe
 #PBS -o xd_rel_cal.2458098.43869.ee.cauchy.out
 
-cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+source ~/.bashrc
+
+conda activate hera
 
 echo "start: $(date)"
 
-/users/mmolnar/anaconda3/envs/hera/bin/python xd_rel_cal.py '2458098.43869' \
---jds 'idr2_jdsx' --pol 'ee' --flag_type 'first' --dist 'cauchy' \
---out_dir 'xd_rel_dfs' --chans '500~700'
+cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+
+python xd_rel_cal.py '2458098.43869' --jds 'idr2_jdsx' --pol 'ee' --flag_type \
+'first' --dist 'cauchy' --out_dir 'xd_rel_dfs' --chans '500~700'
 
 echo "end: $(date)"

@@ -14,11 +14,15 @@
 #PBS -j oe
 #PBS -o opt_cal.2458098.43869.ee.gaussian.out
 
-cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+source ~/.bashrc
+
+conda activate hera
 
 echo "start: $(date)"
 
-/users/mmolnar/anaconda3/envs/hera/bin/python opt_cal.py '2458098.43869' --pol 'ee' \
---dist 'gaussian' --rel_dir 'rel_dfs' --out_dir 'opt_dfs'
+cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
+
+python opt_cal.py '2458098.43869' --pol 'ee' --dist 'gaussian' --rel_dir 'rel_dfs' \
+--out_dir 'opt_dfs'
 
 echo "end: $(date)"
