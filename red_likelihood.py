@@ -57,7 +57,7 @@ def groupBls(bll):
     each row is [group_id, ant_i, ant_j]
     :rtype: ndarray
     """
-    return np.array([(g, i, j) for (g, bl) in enumerate(bll) for (i, j, p) in bl])
+    return numpy.array([(g, i, j) for (g, bl) in enumerate(bll) for (i, j, p) in bl])
 
 
 def condenseMap(arr):
@@ -192,11 +192,11 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
 
     # Collect data together
     no_tints, no_chans = data[list(data.keys())[0]].shape # get filtered data dimensions
-    cdata = numpy.ma.empty((no_chans, no_tints, redg.shape[0]), fill_value=np.nan, \
+    cdata = numpy.ma.empty((no_chans, no_tints, redg.shape[0]), fill_value=np.nan+1j*np.nan, \
                            dtype=complex)
-    for chan in range(len(chans)):
-        cdata[chan, ...] = numpy.ma.hstack([data[(*bl_row[1:], pol)][:, chan, \
-                                           np.newaxis] for bl_row in redg])
+    for b, bl_row in enumerate(redg):
+        cdata[..., b] = data[(*bl_row[1:], pol)].transpose()
+
     if noise:
         # to get correct channel width
         if no_chans == 1:
@@ -229,7 +229,7 @@ def redblMap(redg):
     :rype: ndarray
     """
     bl_ids = numpy.unique(redg[:, 0], return_index=True)
-    return np.array(redg[bl_ids[1], :])
+    return numpy.array(redg[bl_ids[1], :])
 
 
 def red_ant_pos(redg, ant_pos):
@@ -250,8 +250,8 @@ def red_ant_pos(redg, ant_pos):
     :rtype: ndarray
     """
     red_bl_types = redblMap(redg)
-    red_ant_positions = np.array([np.array([ant_pos[i[1]], ant_pos[i[2]]]) \
-                       for i in red_bl_types])
+    red_ant_positions = numpy.array([numpy.array([ant_pos[i[1]], ant_pos[i[2]]]) \
+                                    for i in red_bl_types])
     return red_ant_positions
 
 
