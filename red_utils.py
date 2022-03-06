@@ -37,7 +37,7 @@ def find_zen_file(JD_time):
     :return: File path of visibility dataset
     :rtype: str
     """
-    mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/robust_cal'
+    mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/sample_data'
     nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2'
     zen_file = 'zen.{}.HH.uvh5'.format(JD_time)
     jd_day = zen_file.split('.')[1]
@@ -65,7 +65,7 @@ def find_flag_file(JD_time, cal_type):
     :return: File path of visibility dataset
     :rtype: str, None
     """
-    mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/robust_cal'
+    mdm_dir = '/Users/matyasmolnar/Downloads/HERA_Data/sample_data'
     nrao_dir = '/lustre/aoc/projects/hera/H1C_IDR2/IDR2_2'
     flg_file = 'zen.{}.HH.{}.calfits'.format(JD_time, cal_type)
     jd_day = flg_file.split('.')[1]
