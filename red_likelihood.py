@@ -128,6 +128,11 @@ def group_data(zen_path, pol, chans=None, tints=None, bad_ants=None, \
     if isinstance(tints, int):
         tints = np.asarray([tints])
 
+    if isinstance(chans, list):
+        chans = np.asarray(chans)
+    if isinstance(tints, list):
+        tints = np.asarray(tints)
+
     hd = HERAData(zen_path)
     reds = get_reds(hd.antpos, pols=[pol])
     data, flags, _ = hd.read(freq_chans=chans, polarizations=[pol])
