@@ -26,19 +26,22 @@ def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
     """
     vis_calc = {'amp':numpy.abs, 'phase': numpy.angle}
     bl_id_seperations = numpy.unique(redg[:, 0], return_index=True)[1][1:]
+
     fig, ax = plt.subplots(figsize=figsize)
+
     ax.matshow(vis_calc[vis_type](cdata), aspect='auto')
     for bl_id_seperation in bl_id_seperations:
-        plt.axvline(x=bl_id_seperation, color='white', linestyle='-.', linewidth=1)
+        ax.axvline(x=bl_id_seperation, color='white', linestyle='-.', linewidth=1)
+
     ax.grid(False)
     ax.set_xlabel('Baseline ID')
     ax.set_ylabel('Time Integration')
-    plt.tight_layout()
+
+    fig.tight_layout()
     plt.show()
 
 
-def cplot(carr, figsize=(12, 8), split_ax=False, save_plot=False, save_dir='plots',
-          alpha=None, **kwargs):
+def cplot(carr, figsize=(12, 8), split_ax=False, alpha=None, savefig=None, **kwargs):
     """Plot real and imaginary parts of complex array on same plot
 
     :param carr: Complex 1D array
@@ -53,26 +56,31 @@ def cplot(carr, figsize=(12, 8), split_ax=False, save_plot=False, save_dir='plot
     :type save_dir: str
     """
     if not split_ax:
-        plt.figure(figsize=figsize)
-        plt.plot(carr.real, label='Real', alpha=alpha)
-        plt.plot(carr.imag, label='Imag', alpha=alpha)
+        fig, ax = plt.subplots(figsize=figsize)
+
+        ax.plot(carr.real, label=r'$\mathfrak{Re}$', alpha=alpha)
+        ax.plot(carr.imag, label=r'$\mathfrak{Im}$', alpha=alpha)
+
         for k, v in kwargs.items():
             getattr(plt, k)(v)
-        plt.legend()
+
+        ax.legend(loc='best')
     else:
         fig, ax = plt.subplots(nrows=2, sharex=True, figsize=figsize)
+
         ax[0].plot(carr.real, alpha=alpha)
         ax[1].plot(carr.imag, alpha=alpha)
+
         ax[0].set_ylabel('Real')
         ax[1].set_ylabel('Imag')
-        plt.xlabel('Baseline')
+        ax[1].set_xlabel('Baseline')
+
         if 'title' in kwargs.keys():
             fig.suptitle(kwargs['title'])
-    if save_plot:
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
-        plt.savefig('{}/vis.png'.format(save_dir))
-    plt.tight_layout()
+
+    fig.tight_layout()
+    if savefig is not None:
+        plt.savefig(savefig, bbox_inches='tight')
     plt.show()
 
 
@@ -176,8 +184,10 @@ def plot_res_grouped(df, col, group_by='success', logy=False, ylabel='', \
     y2 = df[~df[group_by]][col].values
 
     fig, ax = plt.subplots(figsize=figsize)
+
     ax.scatter(x1, y1, s=4, alpha=0.5, label=group_by)
     ax.scatter(x2, y2, s=4, color='orange', zorder=1, label='~'+group_by)
+
     ylog = ''
     if logy:
         ax.set_yscale('log')
