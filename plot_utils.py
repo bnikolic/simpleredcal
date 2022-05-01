@@ -478,7 +478,8 @@ def antpos_map(values, flt_ant_pos, title=None, std_rng=2, center=None, \
 
 
 def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
-                 bin_width=None, hist_start=0, ylim=None, logy=False, figsize=(8, 5)):
+                 bin_width=None, hist_start=0, ylim=None, logy=False, savefig=None, \
+                 figsize=(8, 5)):
     """Histogram for flagged and unflagged data on the same plot, with option
     for first and last bins to include outliers
 
@@ -500,6 +501,8 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     :type ylim: int, float, None
     :param logy: Bool to make y-axis scale logarithmic
     :type logy: bool
+    :param savefig: Path to save figure
+    :type savefig: str
     :param figsize: Figure size of plot
     :type figsize: tuple
     """
@@ -557,6 +560,8 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     if logy:
         ax.set_yscale('log')
     plt.legend(loc='best', framealpha=0.5)
-    plt.ticklabel_format(axis='x', style='sci', scilimits=(-2, 2))
+    plt.ticklabel_format(axis='x', style='sci', scilimits=(-1, 1))
     plt.tight_layout()
+    if savefig is not None:
+        plt.savefig(savefig, bbox_inches='tight')
     plt.show()
