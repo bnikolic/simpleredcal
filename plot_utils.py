@@ -10,6 +10,7 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib import ticker
 from matplotlib.colors import LogNorm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def plot_red_vis(cdata, redg, vis_type='amp', figsize=(13, 4)):
@@ -553,10 +554,8 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
         patchesf[-1].set_facecolor('g')
         patchesf[-1].set_label('Flagged upper outliers')
 
-    if xlabel is not None:
-        plt.xlabel(xlabel)
-    if ylim is not None:
-        plt.ylim(ylim)
+    plt.xlabel(xlabel)
+    plt.ylim(ylim)
     if logy:
         ax.set_yscale('log')
     plt.legend(loc='best', framealpha=0.5)
@@ -565,3 +564,75 @@ def flagged_hist(values, flags, xlabel=None, lower_cut=None, upper_cut=None, \
     if savefig is not None:
         plt.savefig(savefig, bbox_inches='tight')
     plt.show()
+
+
+def arr_pcmesh(*args, xlabel=None, ylabel=None, clabel=None, title=None, vmin=None, vmax=None, \
+               xlim=None, ylim=None, extend=None, cmap=sns.cm.rocket_r, sci_fmt=True, savefig=None, \
+               rtn_fig_ax=False, figsize=(7, 5), dpi=125):
+    """Plot pcolormesh of array
+
+    :param args: [X, Y], C: X, Y are the coordinates of the corners and C is the
+    scalar 2D array whose values are colour-mapped
+    :type args: ndarray
+    :param xlabel, ylabel, clabel: labels of plot and colourbar
+    :type xlabel, ylabel, clabel: str
+    :param title: title of the plot
+    :type title: str
+    :param vmin, vmax: colourbar range
+    :type vmin, vmax: float
+    :param xlim, ylim: plot limits
+    :type xlim, ylim: tuple
+    :param extend: how to extend colourbar
+    :type extend: str
+    :param cmap: colour mapping from data values to colour space
+    :type cmap: str, matplotlib colormap name or object, list
+    :param sci_fmt: scientific notation for colourbar ticks
+    :type sci_fmt: bool
+    :param savefig: path to save figure
+    :type savefig: str
+    :param rtn_fig_ax: return figure and ax objects
+    :type rtn_fig_ax: bool
+    :param figsize: figure size of plot
+    :type figsize: tuple
+    :param dpi: dpi
+    :type dpi: int
+    """
+    if savefig is not None:
+        # ensure good resolution for rasterized saved figure
+        dpi = 600
+
+    fig, ax = plt.subplots(figsize=(7, 5), dpi=dpi)
+
+    im = ax.pcolormesh(*args, cmap=cmap, vmin=vmin, vmax=vmax, \
+                       rasterized=savefig is not None)
+
+    ax.invert_yaxis()
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='4%', pad=0.25)
+    cbar = fig.colorbar(im, cax=cax, orientation='vertical', extend=extend, label=clabel)
+
+    if sci_fmt:
+        cbar.formatter.set_scientific(True)
+        cbar.formatter.set_powerlimits((0, 0))
+        cbar.ax.yaxis.set_offset_position('left')
+        # adjust position of scientific notation as max extend hides annotation
+        if extend not in (None, 'min'):
+            cbar.ax.yaxis.get_offset_text().set_visible(False)  # turn off as extend='max' hides the offset
+            if vmax is None:
+                vmax = args[0].max()
+            cbar.ax.text(0.7, 1.06, rf'$\times 10^{{{int(numpy.floor(numpy.log10(vmax)))}}}$', \
+                         va='bottom', ha='center', transform=cax.transAxes)
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    if not rtn_fig_ax:
+        fig.tight_layout()
+        if savefig is not None:
+            plt.savefig(savefig, bbox_inches='tight')
+        plt.show()
+    else:
+        return fig, ax
