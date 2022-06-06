@@ -29,10 +29,10 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
-from fit_diagnostics import append_residuals_opt
-from red_likelihood import decomposeCArray, degVis, doOptCal, flt_ant_pos, \
+from simpleredcal.fit_diagnostics import append_residuals_opt
+from simpleredcal.red_likelihood import decomposeCArray, degVis, doOptCal, flt_ant_pos, \
 group_data, red_ant_sep, relabelAnts, split_rel_results
-from red_utils import find_nearest, find_flag_file, find_rel_df, find_zen_file, \
+from simpleredcal.red_utils import find_nearest, find_flag_file, find_rel_df, find_zen_file, \
 fn_format, get_bad_ants, mod_str_arg, new_fn
 
 

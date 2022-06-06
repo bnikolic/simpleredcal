@@ -1,11 +1,9 @@
 """Batch relative redundant calibration of visibilities across frequencies
 and time
 
-*DEVELOPMENT IMPLEMENTATION*
-
 example run:
 $ python rel_cal.py '2458098.43869' --pol 'ee' --chans 300~301 --tints 0~1 \
---flag_type 'first' --dist 'cauchy' --method 'cartesian'
+--flag_type 'first' --dist 'cauchy'
 
 Can then read the dataframe with:
 > pd.read_pickle('rel_df.2458098.43869.ee.cauchy.pkl')
@@ -31,11 +29,10 @@ import numpy
 
 from hera_cal.io import HERAData
 
-from fit_diagnostics import append_residuals_rel
-from red_likelihood import doRelCal, doRelCalRP, flt_ant_pos, group_data, \
-relabelAnts
-from red_utils import find_flag_file, find_nearest, find_rel_df, find_zen_file, \
-fn_format, get_bad_ants, JD2LSTPATH, match_lst, mod_str_arg, new_fn
+from simpleredcal.fit_diagnostics import append_residuals_rel
+from simpleredcal.red_likelihood import doRelCalD, group_data, relabelAnts
+from simpleredcal.red_utils import check_jdt, find_flag_file, find_nearest, find_rel_df, \
+find_zen_file, fn_format, get_bad_ants, JD2LSTPATH, match_lst, mod_str_arg, new_fn, RESPATH
 
 
 def main():
@@ -70,23 +67,19 @@ def main():
     parser.add_argument('-d', '--dist', required=True, metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
-    parser.add_argument('-m', '--method', required=False, default='cartesian', \
-                        metavar='M', type=str, help='Method to use - {"cartesian", \
-                        "polar", "RP"}, where RP stands for reduced parameters')
-    parser.add_argument('-l', '--logamp', required=False, action='store_true', \
-                        help='Use logamp method to force positive gain amplitudes')
-    parser.add_argument('-g', '--tilt_reg', required=False, action='store_true', \
-                        help='Add regularization term to constrain tilt shifts to 0')
-    parser.add_argument('-a', '--gphase_reg', required=False, action='store_true', \
-                        help='Add regularization term to constrain the gain phase mean')
     parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
                         type=int, help='JD of to find datasets to reuse initial parameters')
     parser.add_argument('-v', '--noise', required=False, action='store_true', \
                         help='Use noise from autos in nlogL calculations')
+    parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
+                        type=str, help='Directory in which relative calibration \
+                        results dataframes are located, if solutions are reused as initial parameters')
     parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
                         type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
                         help='Write data to a new dataframe')
+    parser.add_argument('-k', '--compression', required=False, default=None, metavar='K', \
+                        type=str, help='Compression to use when pickling results dataframe')
     args = parser.parse_args()
 
     startTime = datetime.datetime.now()
@@ -95,12 +88,15 @@ def main():
     default_fn = 'rel_df.{}.{}.{}'.format(args.jd_time, args.pol, args.dist)
     if out_fn is None:
         out_fn = default_fn
-    if args.out_dir is not None:
-        if not os.path.exists(args.out_dir):
-            os.mkdir(args.out_dir)
-        out_fn = os.path.join(args.out_dir, out_fn)
+
+    out_dir = RESPATH
+    if out_dir is not None:
+        out_dir = os.path.join(RESPATH, args.out_dir)
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
+        out_fn = os.path.join(out_dir, out_fn)
         if out_fn is not None:
-            default_fn = os.path.join(args.out_dir, default_fn)
+            default_fn = os.path.join(out_dir, default_fn)
 
     out_csv = fn_format(out_fn, 'csv')
     out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'
@@ -167,8 +163,8 @@ def main():
             skip_cal = True
 
     if not skip_cal:
-        grp = group_data(zen_fn, args.pol, freq_chans, time_ints, \
-                         bad_ants, flag_path=flag_fn, noise=args.noise)
+        grp = group_data(zen_fn, args.pol, chans=freq_chans, tints=time_ints, \
+                         bad_ants=bad_ants, flag_path=flag_fn, noise=args.noise)
         if not args.noise:
             _, RedG, cData = grp
             noisec = None
@@ -184,10 +180,6 @@ def main():
         no_unq_bls = numpy.unique(RedG[:, 0]).size
         cRedG = relabelAnts(RedG)
         psize = (no_ants + no_unq_bls)*2
-        if args.tilt_reg:
-            ant_pos_arr = flt_ant_pos(hd.antpos, ants)
-        else:
-            ant_pos_arr = None
 
         # discarding 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
@@ -206,9 +198,8 @@ def main():
 
         if args.initp_jd is not None:
             jd_time2 = match_lst(args.jd_time, args.initp_jd)
-            if len(str(jd_time2)) < 13:
-                jd_time2 = str(jd_time2) + '0' # add a trailing 0 that is omitted in float
-            rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist)
+            jd_time2 = check_jdt(jd_time2)
+            rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist, rel_dir=args.rel_dir)
             if isinstance(jd_time2, str):
                 jd_time2 = float(jd_time2)
 
@@ -222,7 +213,7 @@ def main():
 
             next_row = numpy.where(last_df['JD_time'] == jd_time2)[0][0] + 1
             rel_df_path2 = find_rel_df(last_df.iloc[next_row]['JD_time'], args.pol, \
-                                       args.dist)
+                                       args.dist, rel_dir=args.rel_dir)
             rel_df2 = pd.read_pickle(rel_df_path2)
             rel_df2 = rel_df2[rel_df2.index.get_level_values('time_int') < offset]
 
@@ -237,120 +228,20 @@ def main():
             time_ints2 = numpy.tile(rel_df_c.index.get_level_values('time_int').unique().values, freq_chans.size)
             iter_dims = [idim+(tint,) for idim, tint in zip(iter_dims, time_ints2)]
 
-            phase_reg_initp = True
-        else:
-            phase_reg_initp = False
 
-
-        def cal(credg, distribution, coords, no_unq_bls, no_ants, logamp, \
-                tilt_reg, gphase_reg, ant_pos_arr, obsvis, noise, initp):
-            """Relative redundant calibration with doRelCal: unconstrained
-            minimizer using cartesian coordinates - this is the fastest solver
-
-            :param credg: Grouped baselines, condensed so that antennas are
-            consecutively labelled. See relabelAnts
-            :type credg: ndarray
-            :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
-            :type distribution: str
-            :param coords: Coordinate system in which gain and visibility parameters
-            have been set up
-            :type coords: str {"cartesian", "polar"}
-            :param no_unq_bls: Number of unique baselines (equivalently the number of
-            redundant visibilities)
-            :type no_unq_bls: int
-            :param no_ants: Number of antennas for given observation
-            :type no_ants: int
-            :param logamp: The logarithm of the amplitude initial parameters is taken,
-            such that only positive solutions can be returned. Only if coords=="polar".
-            :type logamp: bool
-            :param tilt_reg: Add regularization term to constrain tilt shifts to 0
-            :type tilt_reg: bool
-            :param gphase_reg: Add regularization term to constrain the gain phase mean
-            :type gphase_reg: bool
-            :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
-            in ants. See flt_ant_pos.
-            :type ant_pos_arr: ndarray
-            :param obsvis: Observed sky visibilities for a given frequency and given time,
-            reformatted to have format consistent with redg
-            :type obsvis: ndarray
-            :param noise: Noise array to feed into log-likelihood calculations
-            :type noise: ndarray
-            :param initp: Initial parameter guesses for true visibilities and gains
-            :type initp: ndarray, None
-
-            :return: Optimization result for the solved antenna gains and true sky
-            visibilities
-            :rtype: Scipy optimization result object
+        def cal(credg, distribution, no_unq_bls, no_ants, obsvis, noise, initp):
+            """Relative redundant calibration with doRelCalD: default implementation
+            with unconstrained minimizer using cartesian coordinates
             """
-            res_rel, initp_new = doRelCal(credg, obsvis, no_unq_bls, no_ants, \
-                coords=coords, distribution=distribution, noise=noise, \
-                norm_gains=True, logamp=logamp, tilt_reg=tilt_reg, \
-                gphase_reg=gphase_reg, ant_pos_arr=ant_pos_arr, initp=initp, \
-                return_initp=True, phase_reg_initp=phase_reg_initp)
+            res_rel, initp_new = doRelCalD(credg, obsvis, no_unq_bls, no_ants, \
+                distribution=distribution, noise=noise, initp=initp, return_initp=True)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
                 initp = initp_new
             return res_rel, initp
 
-        def cal_RP(credg, distribution, no_unq_bls, no_ants, logamp, \
-                   tilt_reg, gphase_reg, ant_pos_arr, obsvis, noise, initp):
-            """Relative redundant calibration with doRelCalRP: constrained
-            minimizer (by reducing the number of parameters) using polar
-            coordinates
-
-            :param credg: Grouped baselines, condensed so that antennas are
-            consecutively labelled. See relabelAnts
-            :type credg: ndarray
-            :param distribution: Distribution to fit likelihood {'gaussian', 'cauchy'}
-            :type distribution: str
-            :param no_unq_bls: Number of unique baselines (equivalently the number of
-            redundant visibilities)
-            :type no_unq_bls: int
-            :param no_ants: Number of antennas for given observation
-            :type no_ants: int
-            :param logamp: The logarithm of the amplitude initial parameters is taken,
-            such that only positive solutions can be returned. Only if coords=="polar".
-            :type logamp: bool
-            :param tilt_reg: Add regularization term to constrain tilt shifts to 0
-            :type tilt_reg: bool
-            :param gphase_reg: Add regularization term to constrain the gain phase mean
-            :type gphase_reg: bool
-            :param ant_pos_arr: Array of filtered antenna position coordinates for the antennas
-            in ants. See flt_ant_pos.
-            :type ant_pos_arr: ndarray
-            :param obsvis: Observed sky visibilities for a given frequency and given time,
-            reformatted to have format consistent with redg
-            :type obsvis: ndarray
-            :param noise: Noise array to feed into log-likelihood calculations
-            :type noise: ndarray
-            :param initp: Initial parameter guesses for true visibilities and gains
-            :type initp: ndarray, None
-
-            :return: Optimization result for the solved antenna gains and true sky
-            visibilities
-            :rtype: Scipy optimization result object
-            """
-            res_rel, initp_ = doRelCalRP(credg, obsvis, no_unq_bls, no_ants, \
-                distribution=distribution, noise=noise, constr_phase=True, \
-                amp_constr='prod', bounded=True, logamp=logamp, tilt_reg=tilt_reg, \
-                gphase_reg=gphase_reg, ant_pos_arr=gphase_reg, initp=initp)
-            res_rel = {key:res_rel[key] for key in slct_keys}
-            # use solution for next solve in iteration
-            if res_rel['success']:
-                initp = initp_
-            return res_rel, initp
-
-        if args.method.upper() == 'RP':
-            RelCal = functools.partial(cal_RP, cRedG, args.dist, no_unq_bls, no_ants, \
-                                       args.logamp, args.tilt_reg, args.gphase_reg, \
-                                       ant_pos_arr)
-            coords = 'polar'
-        else:
-            RelCal = functools.partial(cal, cRedG, args.dist, args.method, no_unq_bls, \
-                                       no_ants, args.logamp, args.tilt_reg, \
-                                       args.gphase_reg, ant_pos_arr)
-            coords = args.method
+        RelCal = functools.partial(cal, cRedG, args.dist, no_unq_bls, no_ants)
 
         stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
@@ -388,11 +279,14 @@ def main():
                 cData = cData.data
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
-        df = append_residuals_rel(df, cData, cRedG, coords, out_fn=None)
+        df = append_residuals_rel(df, cData, cRedG, 'cartesian', out_fn=None)
         if pkl_exists and not csv_exists:
             df = pd.concat([df, df_pkl])
         df.sort_values(by=indices, inplace=True)
-        df.to_pickle(out_pkl)
+        if args.compression is not None:
+            out_pkl += '.{}'.format(args.compression)
+            print('{} compression used in pickling the dataframe'.format(args.compression))
+        df.to_pickle(out_pkl, compression=args.compression)
         print('Relative calibration results dataframe pickled to {}'.format(out_pkl))
 
         # creating metadata file

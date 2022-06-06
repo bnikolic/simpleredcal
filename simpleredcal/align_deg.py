@@ -19,9 +19,9 @@ import textwrap
 import pandas as pd
 import numpy
 
-from align_utils import align_df, idr2_jds, idr2_jdsx
-from red_likelihood import decomposeCArray, degVis, makeCArray, red_ant_sep
-from red_utils import find_deg_df, find_rel_df, fn_format, JD2LSTPATH, mod_str_arg
+from simpleredcal.align_utils import align_df, idr2_jds, idr2_jdsx
+from simpleredcal.red_likelihood import decomposeCArray, degVis, makeCArray, red_ant_sep
+from simpleredcal.red_utils import find_deg_df, find_rel_df, fn_format, JD2LSTPATH, mod_str_arg
 
 
 def main():

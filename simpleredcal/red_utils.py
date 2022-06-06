@@ -7,6 +7,7 @@ import os
 import pickle
 import re
 import warnings
+from pathlib import Path
 
 import numpy
 import pandas as pd
@@ -17,10 +18,13 @@ from hera_cal.io import HERACal, HERAData
 from hera_cal.redcal import get_reds
 from pyuvdata import utils as uvutils
 
-from red_likelihood import fltBad, groupBls, makeCArray, makeEArray
+from simpleredcal.red_likelihood import fltBad, groupBls, makeCArray, makeEArray
 
-BADANTSPATH = os.path.join(os.path.dirname(__file__), 'bad_ants_idr2.pkl')
-JD2LSTPATH = os.path.join(os.path.dirname(__file__), 'jd_lst_map_idr2.pkl')
+DATAPATH = os.path.join(Path(__file__).parent.absolute(), 'data')
+RESPATH = os.path.join(Path(__file__).parent.absolute().parent.absolute(), 'results')
+
+BADANTSPATH = os.path.join(DATAPATH, 'bad_ants_idr2.pkl')
+JD2LSTPATH = os.path.join(DATAPATH, 'jd_lst_map_idr2.pkl')
 
 warnings.filterwarnings('ignore', \
     message='telescope_location is not set. Using known values for HERA.')
@@ -82,7 +86,7 @@ def find_flag_file(JD_time, cal_type):
     return flg_path
 
 
-def find_rel_df(JD_time, pol, ndist, dir=None):
+def find_rel_df(JD_time, pol, ndist, rel_dir=None):
     """Returns relative calibration results dataframe path for the specified
     JD time, polarization and noise distribution
 
@@ -98,10 +102,10 @@ def find_rel_df(JD_time, pol, ndist, dir=None):
     :return: File path of relative calibration results dataframe
     :rtype: str
     """
-    dir_path = '.'
-    if dir is not None:
-        dir_path = dir
-    df_path = '{}/rel_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, ndist)
+    if rel_dir is None:
+        rel_dir = 'rel_dfs'
+    dir_path = os.path.join(RESPATH, rel_dir)
+    df_path = os.path.join(dir_path, 'rel_df.{}.{}.{}.pkl'.format(JD_time, pol, ndist))
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
@@ -112,7 +116,7 @@ def find_rel_df(JD_time, pol, ndist, dir=None):
     return df_path
 
 
-def find_deg_df(JD_time, pol, deg_dim, ndist, dir=None):
+def find_deg_df(JD_time, pol, deg_dim, ndist, deg_dir=None):
     """Returns degenerate fitting results dataframe path for the specified
     JD time, polarization, degenerate dimension and noise distribution
 
@@ -133,13 +137,15 @@ def find_deg_df(JD_time, pol, deg_dim, ndist, dir=None):
     :return: File path of degenerate fitting results dataframe
     :rtype: str
     """
-    dir_path = '.'
-    if dir is not None:
-        dir_path = dir
+    if deg_dir is None:
+        deg_dir = 'deg_dfs'
     if deg_dim == 'jd':
         deg_dim = 'jd.{}'.format(int(float(JD_time)) + 1)
-    df_path = '{}/deg_df.{}.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, deg_dim, \
-                                                 ndist)
+
+    dir_path = os.path.join(RESPATH, deg_dir)
+    df_path = os.path.join(dir_path, 'deg_df.{}.{}.{}.{}.pkl'.format(dir_path, \
+        JD_time, pol, deg_dim, ndist))
+
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:
@@ -150,7 +156,7 @@ def find_deg_df(JD_time, pol, deg_dim, ndist, dir=None):
     return df_path
 
 
-def find_opt_df(JD_time, pol, ndist, dir=None):
+def find_opt_df(JD_time, pol, ndist, opt_dir=None):
     """Returns optimal calibration results dataframe path for the specified
     JD time, polarization and noise distribution
 
@@ -166,10 +172,12 @@ def find_opt_df(JD_time, pol, ndist, dir=None):
     :return: File path of relative calibration results dataframe
     :rtype: str
     """
-    dir_path = '.'
-    if dir is not None:
-        dir_path = dir
-    df_path = '{}/opt_df.{}.{}.{}.pkl'.format(dir_path, JD_time, pol, ndist)
+    if opt_dir is None:
+        opt_dir = 'opt_dfs'
+    dir_path = os.path.join(RESPATH, opt_dir)
+    df_path = os.path.join(dir_path, 'opt_df.{}.{}.{}.pkl'.format(dir_path, \
+        JD_time, pol, ndist))
+
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
         if not df_glob:

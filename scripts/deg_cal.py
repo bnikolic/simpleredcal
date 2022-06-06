@@ -28,10 +28,10 @@ from csv import DictWriter
 import pandas as pd
 import numpy
 
-from fit_diagnostics import append_residuals_deg
-from red_likelihood import doDegVisVis, red_ant_sep, split_rel_results
-from red_utils import find_nearest, find_rel_df, find_zen_file, fn_format, \
-JD2LSTPATH, match_lst, mod_str_arg, new_fn
+from simpleredcal.fit_diagnostics import append_residuals_deg
+from simpleredcal.red_likelihood import doDegVisVis, red_ant_sep, split_rel_results
+from simpleredcal.red_utils import find_nearest, find_rel_df, find_zen_file, fn_format, \
+JD2LSTPATH, match_lst, mod_str_arg, new_fn, RESPATH
 
 
 def main():
@@ -117,8 +117,10 @@ def main():
 
     # retrieving visibility metadata
     md_fn = 'rel_df.{}.{}.md.pkl'.format(args.jd_time, args.pol)
-    if args.rel_dir is not None:
-        md_fn = os.path.join(args.rel_dir, md_fn)
+    rel_dir = args.rel_dir
+    if rel_dir is None:
+        rel_dir = 'rel_dfs'
+    md_fn = os.path.join(os.path.join(RESPATH, rel_dir), md_fn)
     with open(md_fn, 'rb') as f:
         md = pickle.load(f)
     ant_pos = md['antpos']

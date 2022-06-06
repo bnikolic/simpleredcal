@@ -3,6 +3,7 @@
 
 import os
 import functools
+import warnings
 from copy import deepcopy
 
 import numpy
@@ -26,6 +27,9 @@ from jax.scipy.optimize import minimize as jminimize
 
 # n.b. where 'numpy' is used below it has to be real numpy. 'np' here is the
 # jax implementation
+
+warnings.filterwarnings('ignore', \
+    message='Fixing auto-correlations to be be real-only, after some imaginary values were detected in data_array.')
 
 
 def fltBad(bll, badl, minbl=2):

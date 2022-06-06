@@ -18,8 +18,8 @@ from jax.config import config
 config.update('jax_enable_x64', True)
 from jax import numpy as np
 
-from red_likelihood import group_data
-from red_utils import BADANTSPATH, check_jdt, find_flag_file, find_nearest, \
+from simpleredcal.red_likelihood import group_data
+from simpleredcal.red_utils import BADANTSPATH, check_jdt, find_flag_file, find_nearest, \
 find_zen_file, JD2LSTPATH, lst_to_jd_time, match_lst
 
 warnings.filterwarnings('ignore', \

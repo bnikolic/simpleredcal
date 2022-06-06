@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import numpy
 
-from red_utils import check_jdt, find_deg_df, find_nearest, find_rel_df, \
+from simpleredcal.red_utils import check_jdt, find_deg_df, find_nearest, find_rel_df, \
 JD2LSTPATH, match_lst
 
 

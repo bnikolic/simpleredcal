@@ -4,9 +4,9 @@
 import numpy
 import pandas as pd
 
-from red_likelihood import degVis, group_data, gVis, makeCArray, makeEArray, \
+from simpleredcal.red_likelihood import degVis, group_data, gVis, makeCArray, makeEArray, \
 red_ant_sep, split_rel_results, XDgVis
-from red_utils import find_flag_file, find_zen_file, get_bad_ants
+from simpleredcal.red_utils import find_flag_file, find_zen_file, get_bad_ants
 
 
 def norm_residuals(x_meas, x_pred):

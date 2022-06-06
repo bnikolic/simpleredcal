@@ -1,12 +1,12 @@
-"""Batch relative redundant calibration of visibilities across frequencies
+"""Batch across days relative redundant calibration of visibilities across frequencies
 and time
 
 example run:
-$ python rel_cal.py '2458098.43869' --pol 'ee' --chans 300~301 --tints 0~1 \
---flag_type 'first' --dist 'cauchy'
+$ python xd_rel_cal.py '2458098.43869' --jds '2458098~2458099' --pol 'ee' \
+--chans 300~301 --tints 0~1 --flag_type 'first' --dist 'cauchy'
 
 Can then read the dataframe with:
-> pd.read_pickle('rel_df.2458098.43869.ee.cauchy.pkl')
+> pd.read_pickle('xd_rel_df.1.3826.ee.cauchy.pkl')
 
 Note that default is to write all solutions to the same csv file, for each
 visibility dataset
@@ -29,30 +29,31 @@ import numpy
 
 from hera_cal.io import HERAData
 
-from fit_diagnostics import append_residuals_rel
-from red_likelihood import doRelCalD, group_data, relabelAnts
-from red_utils import check_jdt, find_flag_file, find_nearest, find_rel_df, \
-find_zen_file, fn_format, get_bad_ants, JD2LSTPATH, match_lst, mod_str_arg, new_fn
+from simpleredcal.align_utils import idr2_jds, idr2_jdsx
+from simpleredcal.fit_diagnostics import append_residuals_rel
+from simpleredcal.red_likelihood import doRelCalD, relabelAnts
+from simpleredcal.red_utils import find_zen_file, fn_format, mod_str_arg, new_fn
+from simpleredcal.xd_utils import XDgroup_data
 
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.\
     RawDescriptionHelpFormatter, description=textwrap.dedent("""
-    Relative redundant calibration of visibilities
+    Across days relative redundant calibration of visibilities
 
-    Takes a given HERA visibility dataset in uvh5 file format and performs
-    relative redundant calibration (up to the overall amplitude, overall
-    phase, and phase gradient degenerate parameters) for each frequency channel
-    and each time integration in the dataset.
+    Takes HERA visibility datasets across several JDs in uvh5 file format,
+    aligns them in LAST and then performs relative redundant calibration
+    (up to the overall amplitude, overall phase, and phase gradient degenerate
+    parameters) for each frequency channel and each time integration in the dataset.
 
     Returns a pickled pandas dataframe of the Scipy optimization results for
     the relative redundant calibration for each set of frequency channel and
     time integration.
     """))
     parser.add_argument('jd_time', help='Fractional JD time of dataset to \
-                        calibrate', metavar='JD', type=str)
-    parser.add_argument('-o', '--out', required=False, default=None, \
-                        metavar='O', type=str, help='Output csv and df name')
+                        align other dataframes to', metavar='JD', type=str)
+    parser.add_argument('-j', '--jds', required=True, metavar='J', \
+                        type=str, help='JDs to calibrate')
     parser.add_argument('-p', '--pol', required=True, metavar='P', type=str, \
                         help='Polarization {"ee", "en", "nn", "ne"}')
     parser.add_argument('-c', '--chans', required=False, default=None, metavar='C', \
@@ -67,13 +68,13 @@ def main():
     parser.add_argument('-d', '--dist', required=True, metavar='D', \
                         type=str, help='Fitting distribution for calibration \
                         {"cauchy", "gaussian"}')
-    parser.add_argument('-i', '--initp_jd', required=False, default=None, metavar='I', \
-                        type=int, help='JD of to find datasets to reuse initial parameters')
     parser.add_argument('-v', '--noise', required=False, action='store_true', \
                         help='Use noise from autos in nlogL calculations')
-    parser.add_argument('-r', '--rel_dir', required=False, default=None, metavar='R', \
-                        type=str, help='Directory in which relative calibration \
-                        results dataframes are located, if solutions are reused as initial parameters')
+    parser.add_argument('-cf', '--chan_flag_pct', required=False, default=None, \
+                        metavar='CFP', type=float, help='Flag channel if more than \
+                        X% of day/time slices for a given channel are flagged')
+    parser.add_argument('-o', '--out', required=False, default=None, \
+                        metavar='O', type=str, help='Output csv and df name')
     parser.add_argument('-u', '--out_dir', required=False, default=None, metavar='U', \
                         type=str, help='Out directory to store dataframe')
     parser.add_argument('-n', '--new_df', required=False, action='store_true', \
@@ -84,8 +85,12 @@ def main():
 
     startTime = datetime.datetime.now()
 
+    zen_fn = find_zen_file(args.jd_time)
+    hd = HERAData(zen_fn)
+
     out_fn = args.out
-    default_fn = 'rel_df.{}.{}.{}'.format(args.jd_time, args.pol, args.dist)
+    default_fn = 'xd_rel_df.{}.{}.{}'.format('{:.4f}'.format(hd.lsts[0]), \
+                                             args.pol, args.dist)
     if out_fn is None:
         out_fn = default_fn
     if args.out_dir is not None:
@@ -106,19 +111,20 @@ def main():
             csv_exists = False
             pkl_exists = False
 
-    zen_fn = find_zen_file(args.jd_time)
-    bad_ants = get_bad_ants(zen_fn)
-
-    flag_type = args.flag_type
-    if flag_type is not None:
-        flag_fn = find_flag_file(args.jd_time, flag_type)
+    JDs = args.jds
+    if JDs == 'idr2_jds':
+        JDs = numpy.asarray(idr2_jds)
+    elif JDs == 'idr2_jdsx':
+        JDs = numpy.asarray(idr2_jdsx)
     else:
-        flag_fn = None
+        if '_' in JDs:
+            JDs = numpy.asarray(JDs.split('_'), dtype=int)
+        else:
+            JDs = mod_str_arg(JDs)
+        JDs = numpy.intersect1d(JDs, idr2_jds)
 
     freq_chans = mod_str_arg(args.chans)
     time_ints = mod_str_arg(args.tints)
-
-    hd = HERAData(zen_fn)
 
     pchans = args.chans
     if pchans is None:
@@ -126,10 +132,11 @@ def main():
     ptints = args.tints
     if ptints is None:
         ptints = '0~{}'.format(hd.Ntimes-1)
-    print('Running relative redundant calibration on visibility dataset {} for '\
-          'polarization {}, frequency channel(s) {} and time integration(s) {} '\
-          'with {} assumed noise distribution\n'.\
-          format(os.path.basename(zen_fn), args.pol, pchans, ptints, args.dist))
+    print('Running relative redundant calibration across JDs {} between LASTS '\
+          '{:.4f} and {:.4f} for polarization {}, frequency channel(s) {} '\
+          'and time integration(s) {}, with {} assumed noise distribution.\n'.\
+          format(' '.join(map(str, JDs)), hd.lsts[0], hd.lsts[-1], args.pol, \
+                 pchans, ptints, args.dist))
 
     if freq_chans is None:
         freq_chans = numpy.arange(hd.Nfreqs)
@@ -160,8 +167,11 @@ def main():
             skip_cal = True
 
     if not skip_cal:
-        grp = group_data(zen_fn, args.pol, chans=freq_chans, tints=time_ints, \
-                         bad_ants=bad_ants, flag_path=flag_fn, noise=args.noise)
+        stdout = io.StringIO()
+        with redirect_stdout(stdout): # suppress output
+            grp = XDgroup_data(args.jd_time, JDs, args.pol, chans=freq_chans, \
+                            tints=time_ints, use_flags=args.flag_type, \
+                            noise=args.noise)
         if not args.noise:
             _, RedG, cData = grp
             noisec = None
@@ -176,62 +186,41 @@ def main():
         no_ants = ants.size
         no_unq_bls = numpy.unique(RedG[:, 0]).size
         cRedG = relabelAnts(RedG)
-        psize = (no_ants + no_unq_bls)*2
+        psize = (no_ants*JDs.size + no_unq_bls)*2
 
         # discarding 'jac', 'hess_inv', 'nfev', 'njev'
         slct_keys = ['success', 'status', 'message', 'fun', 'nit', 'x']
         header = slct_keys[:-1] + list(numpy.arange(psize)) + indices
 
         # remove flagged channels from iter_dims
+        if isinstance(flags, numpy.bool_):
+            # If all flags are the same
+            flags = [flags]
         if True in flags:
-            flg_chans = numpy.where(flags.all(axis=(1,2)))[0] # indices
-            print('Flagged channels for visibility dataset {} are: {}\n'.\
-                 format(os.path.basename(zen_fn), freq_chans[flg_chans]))
+            if args.chan_flag_pct is None:
+                flg_chans = numpy.unique(numpy.where(flags.all(axis=(0, 2, 3)))[0])
+                print('Flagged channels across all days are: {}\n'.\
+                      format(freq_chans[flg_chans]))
+            else:
+                flg_pct = args.chan_flag_pct/100
+                flg_chans = numpy.unique(numpy.where(flags.all(axis=3).mean(axis=(0, 2)) \
+                                                     > flg_pct)[0])
+                print('Flagged channels across all days and those that are '\
+                      'more than {}% flagged for their given day/time slice are: {}\n'.\
+                      format(args.chan_flag_pct, freq_chans[flg_chans] ))
             iter_dims = [idim for idim in iter_dims if idim[0] not in flg_chans]
             if not iter_dims: # check if slices to solve are empty
                 print('All specified channels are flagged. Exiting.')
                 sys.exit()
 
-
-        if args.initp_jd is not None:
-            jd_time2 = match_lst(args.jd_time, args.initp_jd)
-            jd_time2 = check_jdt(jd_time2)
-            rel_df_path1 = find_rel_df(jd_time2, args.pol, args.dist, dir=args.rel_dir)
-            if isinstance(jd_time2, str):
-                jd_time2 = float(jd_time2)
-
-            last_df = pd.read_pickle(JD2LSTPATH)
-            last1 = last_df[last_df['JD_time'] == float(args.jd_time)]['LASTs'].values[0]
-            last2 = last_df[last_df['JD_time'] == jd_time2]['LASTs'].values[0]
-            _, offset = find_nearest(last2, last1[0])
-
-            rel_df1 = pd.read_pickle(rel_df_path1)
-            rel_df1 = rel_df1[rel_df1.index.get_level_values('time_int') >= offset]
-
-            next_row = numpy.where(last_df['JD_time'] == jd_time2)[0][0] + 1
-            rel_df_path2 = find_rel_df(last_df.iloc[next_row]['JD_time'], args.pol, \
-                                       args.dist, dir=args.rel_dir)
-            rel_df2 = pd.read_pickle(rel_df_path2)
-            rel_df2 = rel_df2[rel_df2.index.get_level_values('time_int') < offset]
-
-            rel_df_c = pd.concat([rel_df1, rel_df2])
-
-            # filter by specified channels and time integrations
-            time_ints_offset = (time_ints + offset) % hd.Ntimes
-            freq_flt = numpy.in1d(rel_df_c.index.get_level_values('freq'), freq_chans)
-            tint_flt = numpy.in1d(rel_df_c.index.get_level_values('time_int'), time_ints_offset)
-            rel_df_c = rel_df_c[freq_flt & tint_flt]
-
-            time_ints2 = numpy.tile(rel_df_c.index.get_level_values('time_int').unique().values, freq_chans.size)
-            iter_dims = [idim+(tint,) for idim, tint in zip(iter_dims, time_ints2)]
-
-
         def cal(credg, distribution, no_unq_bls, no_ants, obsvis, noise, initp):
-            """Relative redundant calibration with doRelCalD: default implementation
-            with unconstrained minimizer using cartesian coordinates
+            """Relative redundant calibration across days with doRelCalD:
+            default implementation with unconstrained minimizer using cartesian
+            coordinates
             """
             res_rel, initp_new = doRelCalD(credg, obsvis, no_unq_bls, no_ants, \
-                distribution=distribution, noise=noise, initp=initp, return_initp=True)
+                distribution=distribution, noise=noise, initp=initp, \
+                return_initp=True, xd=True)
             res_rel = {key:res_rel[key] for key in slct_keys}
             # use solution for next solve in iteration
             if res_rel['success']:
@@ -240,7 +229,6 @@ def main():
 
         RelCal = functools.partial(cal, cRedG, args.dist, no_unq_bls, no_ants)
 
-        stdout = io.StringIO()
         with redirect_stdout(stdout): # suppress output
             with open(out_csv, 'a') as f: # write / append to csv file
                 writer = DictWriter(f, fieldnames=header)
@@ -248,17 +236,15 @@ def main():
                     writer.writeheader()
                 initp = None
                 for i, iter_dim in enumerate(iter_dims):
-                    if args.initp_jd is not None:
-                        initp = rel_df_c.loc[(freq_chans[iter_dim[0]], iter_dim[2])]\
-                                [len(slct_keys[:-1]):-2].values.astype(float)
                     if args.noise:
-                        noisec = cNData[iter_dim[:2]]
-                    res_rel, initp = RelCal(cData[iter_dim[:2]], noisec, initp)
+                        noisec = cNData[:, iter_dim[0], iter_dim[1], :]
+                    res_rel, initp = RelCal(cData[:, iter_dim[0], iter_dim[1], :], \
+                                            noisec, initp)
                     # expanding out the solution
                     for j, param in enumerate(res_rel['x']):
                         res_rel[j] = param
                     # reset initp after each frequency slice
-                    if not (i+1)%no_tints and args.initp_jd is None:
+                    if not (i+1)%no_tints:
                         initp = None
                     del res_rel['x']
                     res_rel.update({indices[0]:freq_chans[iter_dim[0]], \
@@ -271,8 +257,9 @@ def main():
             freqs = df['freq'].unique()
             tints = df['time_int'].unique()
             if cData.shape[0] != freqs.size or cData.shape[1] != tints.size:
-                _, _, cData = group_data(zen_fn, args.pol, freqs, tints, \
-                                         bad_ants, flag_path=flag_fn)
+                _, _, cData = XDgroup_data(args.jd_time, JDs, args.pol, chans=freqs,
+                                           tints=tints, use_flags=args.flag_type, \
+                                           noise=None)
                 cData = cData.data
         df.set_index(indices, inplace=True)
         # we now append the residuals as additional columns
@@ -291,7 +278,7 @@ def main():
         if not os.path.exists(out_md):
             md = {'no_ants':no_ants, 'no_unq_bls':no_unq_bls, 'redg':RedG, \
                   'antpos':hd.antpos, 'last':hd.lsts, 'Nfreqs':hd.Nfreqs, \
-                  'Ntimes':hd.Ntimes}
+                  'Ntimes':hd.Ntimes, 'JDs':JDs}
             with open(out_md, 'wb') as f:
                 pickle.dump(md, f, protocol=pickle.HIGHEST_PROTOCOL)
             print('Relative calibration metadata pickled to {}\n'.format(out_md))

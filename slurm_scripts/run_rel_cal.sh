@@ -13,7 +13,7 @@
 #SBATCH --nodes=1                                          # Request 1 node
 #SBATCH --ntasks-per-node=4                                # Request 4 cores
 #SBATCH --time=100:00:00                                   # Request 100 hours, 0 minutes and 0 seconds.
-#SBATCH --output=opt_cal.2458098.43869.ee.gaussian.out
+#SBATCH --output=rel_cal.2458098.43869.ee.gaussian.out
 
 source ~/.bashrc
 
@@ -23,7 +23,7 @@ echo "start: $(date)"
 
 cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
 
-python opt_cal.py '2458098.43869' --pol 'ee' --dist 'gaussian' --rel_dir 'rel_dfs' \
---out_dir 'opt_dfs'
+python script/rel_cal.py '2458098.43869' --pol 'ee' --flag_type 'first' --dist 'gaussian' \
+--initp_jd 2458099 --out_dir 'rel_dfs' --rel_dir 'rel_dfs'
 
 echo "end: $(date)"

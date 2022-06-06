@@ -12,8 +12,8 @@
 #SBATCH --mail-type=BEGIN,END,FAIL                         # Send email on begin, end, and fail of job
 #SBATCH --nodes=1                                          # Request 1 node
 #SBATCH --ntasks-per-node=4                                # Request 4 cores
-#SBATCH --time=12:00:00                                    # Request 12 hours, 0 minutes and 0 seconds.
-#SBATCH --output=deg_cal.2458098.43869.ee.jd.2458099.gaussian.out
+#SBATCH --time=100:00:00                                   # Request 100 hours, 0 minutes and 0 seconds.
+#SBATCH --output=opt_cal.2458098.43869.ee.gaussian.out
 
 source ~/.bashrc
 
@@ -23,8 +23,7 @@ echo "start: $(date)"
 
 cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
 
-python deg_cal.py '2458098.43869' --deg_dim 'jd' \
---pol 'ee' --dist 'gaussian' --coords 'cartesian' --tgt_jd 2458099 \
---rel_dir 'rel_dfs' --out_dir 'deg_dfs'
+python script/opt_cal.py '2458098.43869' --pol 'ee' --dist 'gaussian' --rel_dir 'rel_dfs' \
+--out_dir 'opt_dfs'
 
 echo "end: $(date)"
