@@ -51,10 +51,10 @@ def cplot(carr, figsize=(12, 8), split_ax=False, alpha=None, savefig=None, **kwa
     :type figsize: tuple
     :param split_ax: Split real and imag components onto separate axes?
     :type split_ax: bool
-    :param save_plot: Save plot?
-    :type save_plot: bool
-    :param save_dir: Path of directory to save plots
-    :type save_dir: str
+    :param alpha: alpha for lineplots
+    :type alpha: float
+    :param savefig: Path of directory to save plots
+    :type savefig: str
     """
     if not split_ax:
         fig, ax = plt.subplots(figsize=figsize)
