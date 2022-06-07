@@ -32,7 +32,7 @@ from hera_cal.io import HERAData
 from simpleredcal.align_utils import idr2_jds, idr2_jdsx
 from simpleredcal.fit_diagnostics import append_residuals_rel
 from simpleredcal.red_likelihood import doRelCalD, relabelAnts
-from simpleredcal.red_utils import find_zen_file, fn_format, mod_str_arg, new_fn
+from simpleredcal.red_utils import find_zen_file, fn_format, mod_str_arg, new_fn, RESPATH
 from simpleredcal.xd_utils import XDgroup_data
 
 
@@ -93,12 +93,16 @@ def main():
                                              args.pol, args.dist)
     if out_fn is None:
         out_fn = default_fn
-    if args.out_dir is not None:
-        if not os.path.exists(args.out_dir):
-            os.mkdir(args.out_dir)
-        out_fn = os.path.join(args.out_dir, out_fn)
-        if out_fn is not None:
-            default_fn = os.path.join(args.out_dir, default_fn)
+
+    out_dir = args.out_dir
+    if out_dir is None:
+        out_dir = 'xd_rel_dfs'
+    out_dir = os.path.join(RESPATH, out_dir)
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    out_fn = os.path.join(out_dir, out_fn)
+    default_fn = os.path.join(out_dir, default_fn)
 
     out_csv = fn_format(out_fn, 'csv')
     out_pkl = out_csv.rsplit('.', 1)[0] + '.pkl'

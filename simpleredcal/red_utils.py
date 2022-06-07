@@ -143,8 +143,8 @@ def find_deg_df(JD_time, pol, deg_dim, ndist, deg_dir=None):
         deg_dim = 'jd.{}'.format(int(float(JD_time)) + 1)
 
     dir_path = os.path.join(RESPATH, deg_dir)
-    df_path = os.path.join(dir_path, 'deg_df.{}.{}.{}.{}.pkl'.format(dir_path, \
-        JD_time, pol, deg_dim, ndist))
+    df_path = os.path.join(dir_path, 'deg_df.{}.{}.{}.{}.pkl'.format(JD_time, \
+        pol, deg_dim, ndist))
 
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
@@ -175,8 +175,8 @@ def find_opt_df(JD_time, pol, ndist, opt_dir=None):
     if opt_dir is None:
         opt_dir = 'opt_dfs'
     dir_path = os.path.join(RESPATH, opt_dir)
-    df_path = os.path.join(dir_path, 'opt_df.{}.{}.{}.pkl'.format(dir_path, \
-        JD_time, pol, ndist))
+    df_path = os.path.join(dir_path, 'opt_df.{}.{}.{}.pkl'.format(JD_time, \
+        pol, ndist))
 
     if not os.path.exists(df_path):
         df_glob = glob.glob('.*.'.join(df_path.rsplit('.', 1)))
