@@ -23,7 +23,7 @@ echo "start: $(date)"
 
 cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
 
-python script/opt_cal.py '2458098.43869' --pol 'ee' --dist 'gaussian' --rel_dir 'rel_dfs' \
+python scripts/opt_cal.py '2458098.43869' --pol 'ee' --dist 'gaussian' --rel_dir 'rel_dfs' \
 --out_dir 'opt_dfs'
 
 echo "end: $(date)"

@@ -23,7 +23,7 @@ echo "start: $(date)"
 
 cd /lustre/aoc/projects/hera/mmolnar/simpleredcal
 
-python script/deg_cal.py '2458098.43869' --deg_dim 'jd' \
+python scripts/deg_cal.py '2458098.43869' --deg_dim 'jd' \
 --pol 'ee' --dist 'gaussian' --coords 'cartesian' --tgt_jd 2458099 \
 --rel_dir 'rel_dfs' --out_dir 'deg_dfs'
 
